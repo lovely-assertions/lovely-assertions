@@ -1,0 +1,63 @@
+# Optional, and the fast half of the gate rather than a second copy of it:
+#
+#     uvx pre-commit install --install-hooks --hook-type pre-commit --hook-type pre-push
+#
+# The formatting and lint hooks are `local` on purpose. `astral-sh/ruff-pre-commit`
+# would install its *own* ruff, at whichever version that mirror last tagged,
+# which is not the one in `uv.lock` -- so a hook could reformat a file the way CI
+# then rejects. Running the locked ruff through `uv run` means there is exactly
+# one ruff in this repository.
+
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # File-shape checks only; nothing here rewrites content. Deliberately not
+      # `trailing-whitespace` or `end-of-file-fixer`: two trailing spaces are a
+      # hard line break in Markdown, and every page under `docs/` is executed
+      # with its output compared character for character.
+      - id: check-toml
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --no-sync ruff format
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --no-sync ruff check --fix
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      # Whole-project checks, so they run once before a push rather than on
+      # every commit. Both read their configuration from `pyproject.toml` and
+      # take no filenames: a strict check of one file in a package whose types
+      # flow across modules is not a check.
+      - id: pyright
+        name: pyright (strict)
+        entry: uv run --no-sync pyright
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: mypy
+        name: mypy (strict)
+        entry: uv run --no-sync mypy
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

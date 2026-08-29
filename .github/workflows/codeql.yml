@@ -1,0 +1,52 @@
+name: CodeQL
+
+# NOTE: this is the *advanced* configuration. GitHub's "default setup" for code
+# scanning is mutually exclusive with it -- enabling default setup in the
+# repository settings makes every run of this workflow fail with a message about
+# the conflict. Pick one; this repository picks the file, so the analysis is
+# reviewable in the same place as everything else.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "43 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze (python)
+    runs-on: ubuntu-latest
+    # Uploading results needs code scanning, which a private repository only has
+    # with GitHub Advanced Security -- without it the analysis runs to completion
+    # and then fails on the upload with "Resource not accessible by integration".
+    # A permanently red tab trains people to stop reading the tab, so this waits
+    # for the repository to be public rather than failing every week until it is.
+    if: github.event.repository.visibility == 'public'
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          languages: python
+          build-mode: none
+          # `security-and-quality` over the default `security-extended`: this is
+          # a library whose product is its correctness, so the quality queries
+          # are worth reading rather than noise to be filtered.
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          category: "/language:python"

@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Environments
+.venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.mypy_cache_negative/
+.pyright_cache/
+
+# Coverage. `.coverage.*` is the per-run data the matrix produces, and
+# `coverage.xml` is what the analysis job reads -- both are build output.
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Claude Code local overrides (personal, never shared)
+.claude/settings.local.json
+CLAUDE.local.md
+# Agent worktrees. Claude Code excludes these through `.git/info/exclude`, which
+# is local to one clone -- so the ignore has to be here too, or the first
+# contributor to run an isolated agent commits a second copy of the repository.
+.claude/worktrees/

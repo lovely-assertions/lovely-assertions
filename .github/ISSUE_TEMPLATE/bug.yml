@@ -1,0 +1,66 @@
+name: Bug report
+description: Something behaves differently from what it documents
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A failure **message** that is vague, misleading, or says less than the
+        comparison it replaces is a bug here, not a nitpick. Report it as one.
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: What you ran
+      description: The smallest snippet that shows it. It will be pasted into a file and run as-is.
+      render: python
+      placeholder: |
+        from lovely_assertions import expect
+
+        expect([3, 1, 2]).is_sorted()
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The failure message, traceback, or checker error — copied, not paraphrased.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+      description: If this is about a message, write the sentence you think it should have printed.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`python -c \"import lovely_assertions; print(lovely_assertions.__version__)\"`"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python and platform
+      placeholder: "3.13.14, macOS 15"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: checker
+    attributes:
+      label: Does a type checker see it too?
+      description: Only if the report is about typing — narrowing, an overload, a missing method on a subject.
+      options:
+        - Not a typing issue
+        - pyright
+        - mypy
+        - both

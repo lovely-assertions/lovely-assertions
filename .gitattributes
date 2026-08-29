@@ -1,0 +1,21 @@
+# One line ending everywhere in the repository, so that a Windows checkout and a
+# Linux one hold byte-identical files. This is not housekeeping here: the
+# equality diff distinguishes "the lines are identical; the strings differ only
+# in their line endings" from a real difference, and `docs/` pages are executed
+# and their output compared character for character. A checkout that silently
+# rewrites CRLF would change what the suite is testing.
+* text=auto eol=lf
+
+# Binary, never touched.
+*.png binary
+*.jpg binary
+*.ico binary
+
+# Generated, and generated from the source rather than edited: mark it so a
+# diff of it reads as the output it is.
+docs/reference/assertions.md linguist-generated=true
+uv.lock linguist-generated=true
+
+# The negative typing corpus exists to be rejected by a type checker. Counting
+# it as Python skews the language statistics with code that is wrong on purpose.
+typing_tests/negative/** linguist-vendored=true

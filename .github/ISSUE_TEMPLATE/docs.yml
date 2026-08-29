@@ -1,0 +1,28 @@
+name: Documentation problem
+description: A page is wrong, missing, or sends you the wrong way
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every Python block under `docs/` is executed by the test suite and every
+        quoted failure message is compared against what the library actually
+        prints — so a **quoted output** that is wrong is a build failure, and
+        worth saying so loudly. Prose has no such harness, which is where most
+        of these live.
+
+  - type: input
+    id: page
+    attributes:
+      label: Which page
+      placeholder: "docs/guides/collections.md"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What it says, and why that is wrong
+      description: Quote the sentence. If you ran something that disagrees with it, include that too.
+    validations:
+      required: true

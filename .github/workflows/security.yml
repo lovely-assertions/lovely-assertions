@@ -1,0 +1,108 @@
+name: Security
+
+# Two things the ordinary gates cannot see: whether the workflows themselves are
+# safe to run, and whether anything in the locked dev tree has a published
+# advisory. Both are cheap, so both run on every change that could introduce one
+# and weekly regardless -- an advisory is published against code that has not
+# changed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "uv.lock"
+      - "pyproject.toml"
+  schedule:
+    # Mondays, 06:17 UTC. Off the hour on purpose: the top of the hour is when
+    # every scheduled workflow on GitHub queues at once.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.12.4"
+
+jobs:
+  workflows:
+    name: zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Findings land in the Security tab rather than only in a log nobody
+      # re-reads.
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      # Pinned like an action, and for the same reason: a bare `uvx zizmor`
+      # resolves the newest release at run time, so a gate could change its mind
+      # without a commit.
+      # Twice, and not by accident: `--format sarif` makes zizmor exit 0 even when
+      # it finds something, because SARIF is a report format and the consumer is
+      # meant to be the code-scanning UI. Running only that form gives a job that
+      # uploads findings and then reports success -- a gate that cannot fail is
+      # not a gate. So the SARIF run produces the report, and a second run in the
+      # default form supplies the exit code.
+      - name: audit the workflows, for the report
+        run: uvx zizmor==1.29.0 --format sarif --persona regular . > zizmor.sarif
+      - uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        id: report
+        # Upload what was found even when the verdict step is about to fail on
+        # it: the finding is more useful in the Security tab than in a log.
+        #
+        # `continue-on-error` because this step is the *report* and the next one
+        # is the *gate*, and the two must not be able to mask each other.
+        # Uploading needs code scanning, which a private repository only has with
+        # GitHub Advanced Security -- so without it this step fails with
+        # "Resource not accessible by integration" and, left required, would skip
+        # the verdict entirely. A findings-free audit would then look identical
+        # to an audit that never ran.
+        continue-on-error: true
+        with:
+          sarif_file: zizmor.sarif
+          category: zizmor
+      - name: say so if the report could not be filed
+        if: steps.report.outcome == 'failure'
+        run: |
+          echo "::warning title=SARIF upload failed::\
+          zizmor's findings could not be filed as code-scanning alerts. On a private \
+          repository that needs GitHub Advanced Security. The audit itself still ran, \
+          and the next step is what decides this job."
+      # The gate. Runs whatever the report did, and it is this exit code that
+      # fails the job -- `--format sarif` returns 0 even on a finding, because
+      # SARIF is a report format whose consumer is the code-scanning UI.
+      - name: audit the workflows, for the verdict
+        if: always()
+        run: uvx zizmor==1.29.0 --persona regular .
+
+  dependencies:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      # The package itself declares no runtime dependencies, so this audits the
+      # development and CI tree -- which is what an attacker would reach for
+      # here, since nothing else runs with write access to the repository.
+      - name: export the locked dev tree
+        run: uv export --all-groups --no-emit-project --no-hashes --format requirements.txt -o audit-requirements.txt
+      - name: audit it
+        run: uvx pip-audit==2.10.1 --strict --requirement audit-requirements.txt

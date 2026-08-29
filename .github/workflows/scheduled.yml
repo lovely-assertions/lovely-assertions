@@ -1,0 +1,145 @@
+name: Scheduled
+
+# Suites that are worth running but not worth gating a pull request live here,
+# so their exclusion from `CI success` is structural rather than something a
+# reader has to infer from an `if:` buried in ci.yml.
+
+on:
+  schedule:
+    - cron: "51 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.12.4"
+
+jobs:
+  benchmarks:
+    name: benchmarks (reported, never asserted)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked --python 3.13
+      # Timings on a shared runner are not a pass/fail signal, so nothing here
+      # is asserted -- this exists so the benchmarks stay executable and so
+      # there is a durable record to compare by hand. The claims that hold on
+      # any machine (no allocation on a passing assertion, a bounded import) are
+      # ordinary tests in the suite `ci.yml` runs.
+      - name: run them and keep the numbers
+        run: |
+          {
+            echo '### Benchmarks'
+            echo
+            echo '```'
+            uv run --no-sync python -m benchmarks
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  fuzz:
+    name: fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [equality, strings, hostile]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      # atheris publishes manylinux x86_64 wheels and nothing else, which is why
+      # this job pins the platform and why the group is opt-in: an ordinary
+      # `uv sync` must keep working on a maintainer's macOS machine.
+      - run: uv sync --locked --group fuzz --python 3.13
+      # Time-boxed rather than run-count-boxed: the budget that matters is the
+      # weekly job's wall clock, and a run count means something different on
+      # every runner. A crash makes libFuzzer exit non-zero, which fails the job
+      # -- a fuzzer that finds something and reports success is the same defect
+      # as a linter that cannot fail.
+      - name: fuzz
+        run: |
+          uv run --no-sync python -m fuzz.fuzz_${{ matrix.target }} \
+            -max_total_time=300 \
+            -rss_limit_mb=4096 \
+            -print_final_stats=1
+      # The reproducer is the whole value of a crash, and it is written to the
+      # working directory as `crash-<sha1>`. Without this it dies with the runner.
+      - name: keep the reproducer
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: |
+            crash-*
+            leak-*
+            timeout-*
+          if-no-files-found: ignore
+          retention-days: 30
+
+  next-python:
+    name: forward compatibility (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    # A pre-release interpreter is allowed to be broken; finding out early is
+    # the point, being blocked by it is not.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.15"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked --python ${{ matrix.python-version }}
+      - run: uv run --no-sync pytest -q
+
+  lowest-tooling:
+    name: the declared tool floors are real
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      # `[dependency-groups]` declares a lower bound for every tool, and a lower
+      # bound nobody runs is a guess. Both checkers change what they accept
+      # between releases, so "mypy >= x" is a claim about mypy x specifically.
+      #
+      # This resolves the floors into a throwaway lock and then passes
+      # `--frozen` to everything after it: a plain `uv sync` would notice the
+      # lock is not the committed one and quietly re-resolve at the highest
+      # versions, un-testing the very thing being tested.
+      - name: resolve the declared minimums
+        run: |
+          rm uv.lock
+          uv lock --resolution lowest-direct --python 3.13
+          uv sync --frozen --python 3.13
+      # `uv pip list`, not `python -m pip list`: a uv-created environment has no
+      # pip in it, so the latter exits 1 and takes the job with it -- which is
+      # how this gate came to report a failure without having run ruff, either
+      # checker, or the suite. A step that reports what was installed must not be
+      # able to decide whether the floors hold.
+      - name: what actually got installed
+        run: uv pip list
+      - run: uv run --frozen --no-sync ruff check .
+      - run: uv run --frozen --no-sync pyright
+      - run: uv run --frozen --no-sync mypy
+      - run: uv run --frozen --no-sync pytest -q

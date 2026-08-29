@@ -1,0 +1,47 @@
+name: Propose an assertion
+description: A check the catalogue does not offer yet
+labels: ["enhancement", "assertion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An assertion earns its place by the **sentence it prints when it fails**.
+        If that sentence says no more than the comparison a reader would have
+        written by hand, the assertion is not worth adding — so the message is
+        the first question below rather than the last.
+
+  - type: input
+    id: signature
+    attributes:
+      label: The call
+      placeholder: "expect(value).is_a_valid_semver()"
+    validations:
+      required: true
+
+  - type: input
+    id: subject
+    attributes:
+      label: Which subject offers it
+      description: The type of `value`. It should not appear on subjects where it is meaningless.
+      placeholder: "str"
+    validations:
+      required: true
+
+  - type: textarea
+    id: message
+    attributes:
+      label: What it prints when it fails
+      description: Write the sentence. `Expected {name} {expectation}` — what was expected, and what was actually there.
+      render: text
+      placeholder: |
+        Expected release_tag to be a valid semantic version, but '1.2' has no patch component.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why the existing catalogue does not cover it
+      description: Which assertion you reached for first, and what its message failed to tell you.
+    validations:
+      required: true

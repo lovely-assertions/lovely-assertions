@@ -1,0 +1,90 @@
+# git-cliff -- the changelog is generated from the commit log, not maintained
+# beside it.
+#
+# The premise is a convention this repository already enforces: a CI gate
+# requires every commit subject to be a Conventional Commit, and the etiquette
+# says the summary is written for a reader who will never see the diff. That is
+# the same sentence a changelog entry needs, so writing it twice only creates
+# something to drift. The commit *body* is carried through as well, so an entry
+# that needs a paragraph of explanation gets one.
+#
+#   uvx git-cliff==2.13.1 -o CHANGELOG.md      # the whole history
+#   uvx git-cliff==2.13.1 --latest             # just the newest tag, for a release body
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project are documented here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+**This file is generated** from the commit log by
+[git-cliff](https://git-cliff.org). Don't edit it -- write the commit message,
+which a CI gate already requires to be a Conventional Commit.
+
+"""
+
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{{ commit.message | upper_first }}
+{% if commit.body %}
+{{ commit.body | trim | indent(prefix="  ", first=true) }}
+{% endif %}\
+{% endfor %}\
+{% endfor %}
+"""
+
+trim = true
+footer = ""
+
+[git]
+# Everything below a `---` in a commit body is scaffolding, not changelog: the
+# pull request template puts its review checklist there, and the squash carries
+# the whole body through verbatim. Without this the first merged PR publishes its
+# own checkboxes into CHANGELOG.md, and nothing anywhere would have noticed.
+commit_preprocessors = [
+  { pattern = "(?s)\n---\n.*", replace = "" },
+  # And the template's own guidance comments. They are invisible in a rendered
+  # page, so they would go unnoticed in the file itself for a long time.
+  { pattern = "(?s)<!--.*?-->", replace = "" },
+]
+
+conventional_commits = true
+# An unconventional subject cannot be classified, and inventing a section for it
+# would put a line in the changelog that says nothing. The commit gate keeps
+# these out of `main` in the first place.
+filter_unconventional = true
+filter_commits = true
+protect_breaking_commits = true
+split_commits = false
+tag_pattern = "v[0-9]*"
+topo_order = false
+sort_commits = "oldest"
+
+# Keep a Changelog's own vocabulary, so the sections mean what a reader of that
+# format expects. Anything not listed is dropped: a reader of a changelog wants
+# to know what changed about the package, not that its lint configuration moved.
+commit_parsers = [
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Changed" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^revert", group = "Removed" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^build", group = "Changed" },
+  { message = "^(chore|ci|style|test)", skip = true },
+  { body = ".*security", group = "Security" },
+]
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = true

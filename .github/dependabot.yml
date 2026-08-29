@@ -1,0 +1,51 @@
+version: 2
+
+updates:
+  # Actions are pinned by commit SHA, which means nothing tells us a pin is
+  # stale -- a SHA does not expire. Dependabot is what turns "pinned" into
+  # "pinned and current": it opens a pull request that moves the SHA and the
+  # trailing version comment together, which is exactly the edit the convention
+  # asks for by hand.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    # Wait a week before proposing a release. The window exists because a
+    # compromised or broken version is usually yanked within days of publication,
+    # and an update that lands the hour it is published gives nobody the chance
+    # to notice. Trading a week of latency for that is the right way round on a
+    # repository whose actions run with write access.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels: ["dependencies", "ci"]
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Development tooling only -- the package declares no runtime dependencies, so
+  # there is nothing here that reaches a consumer's tree.
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    # Wait a week before proposing a release. The window exists because a
+    # compromised or broken version is usually yanked within days of publication,
+    # and an update that lands the hour it is published gives nobody the chance
+    # to notice. Trading a week of latency for that is the right way round on a
+    # repository whose actions run with write access.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build"
+    labels: ["dependencies"]
+    groups:
+      dev-tooling:
+        patterns: ["*"]

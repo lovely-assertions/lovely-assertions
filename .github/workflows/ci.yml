@@ -1,0 +1,391 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only by default. A job that needs more elevates for itself and says why;
+# nothing is granted workflow-wide.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # setup-uv verifies the uv download against a checksum table baked into the
+  # action, and for a version it does not know it skips that validation
+  # *silently* rather than failing. So this pin and the setup-uv SHA move
+  # together: 0.12.4 is the newest uv the pinned v10.0.1 carries a checksum for.
+  # Raising one without the other leaves the pin unverified with nothing to say so.
+  UV_VERSION: "0.12.4"
+  FORCE_COLOR: "1"
+
+jobs:
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked --python 3.13
+      - name: ruff check
+        run: uv run --no-sync ruff check --output-format=github .
+      - name: ruff format --check
+        run: uv run --no-sync ruff format --check .
+
+  types:
+    name: pyright + mypy (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked --python ${{ matrix.python-version }}
+      # pyright is the reference checker. A regression here fails the build.
+      - name: pyright (strict)
+        run: uv run --no-sync pyright --pythonversion ${{ matrix.python-version }}
+      # mypy runs strict beside it. Known divergences live in a frozen, explained
+      # ignore list -- never in a shaved-down API.
+      - name: mypy (strict)
+        run: uv run --no-sync mypy --python-version ${{ matrix.python-version }}
+      # A typed package that leaks an unknown type into its public surface is a
+      # partly untyped package, and nothing else in the pipeline would notice.
+      # `--ignoreexternal` is not optional: without it typeshed's own gaps
+      # dominate the score and the gate measures the wrong tree.
+      - name: py.typed completeness must stay at 100%
+        run: |
+          uv run --no-sync pyright --verifytypes lovely_assertions --ignoreexternal \
+            --outputjson > verifytypes.json || true
+          uv run --no-sync python - <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report = json.loads(pathlib.Path("verifytypes.json").read_text(encoding="utf-8"))
+          score = report["typeCompleteness"]["completenessScore"]
+          print(f"type completeness: {score:.4%}")
+          if score < 1:
+              missing = report["typeCompleteness"].get("symbols", [])
+              for symbol in missing:
+                  if not symbol.get("isTypeKnown", True):
+                      print(f"  incomplete: {symbol['name']}")
+              sys.exit("public surface is no longer fully typed")
+          PY
+
+  test:
+    name: pytest (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked --python ${{ matrix.python-version }}
+      # Untraced, and deliberately so: a handful of performance invariants read a
+      # measurement that cannot be taken while `sys.settrace` is active and skip
+      # themselves under coverage. This is the run in which they execute. The
+      # `coverage` job below runs the same suite traced; neither substitutes for
+      # the other.
+      #
+      # Includes the documentation harness, which executes every `python` block
+      # under `docs/` and compares every quoted result, and the typing-surface
+      # harness, which shells out to the real pyright and mypy to prove the
+      # negative corpus is still rejected.
+      - run: uv run --no-sync pytest
+
+  coverage:
+    name: coverage (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked --python 3.13
+      # The filesystem assertions branch on what the platform can express -- a
+      # symlink, a permission, a path separator -- so one runner's view of this
+      # package is not the whole of it. Each row records its own data file and
+      # the report job takes their union.
+      #
+      # `--cov-fail-under=0` because the floor belongs on that union, not on any
+      # single row: a platform that cannot express a symlink would otherwise fail
+      # here for lines another platform covers, and fail *before* uploading the
+      # data that would have proved it.
+      - name: run the suite traced
+        shell: bash
+        run: |
+          uv run --no-sync pytest --cov --cov-report= --cov-fail-under=0 -q
+          # pytest-cov combines its own parallel data at the end of the run, so
+          # what is on disk here is a single `.coverage`. Give it a name unique
+          # across the matrix; `coverage combine` in the report job recognises
+          # the suffix.
+          mv .coverage ".coverage.${{ matrix.os }}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-data-${{ matrix.os }}
+          path: .coverage.${{ matrix.os }}
+          # A leading dot makes it a hidden file, and upload-artifact drops those
+          # unless told otherwise -- which would leave the report job combining
+          # nothing and reporting zero.
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  coverage-report:
+    name: coverage floor
+    runs-on: ubuntu-latest
+    needs: [coverage]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked --python 3.13
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: coverage-data-*
+          merge-multiple: true
+      - name: combine every platform's data
+        run: uv run --no-sync coverage combine
+      # Reporting and enforcing are separate steps on purpose, in that order:
+      # a build that breaches the floor should still leave behind the table that
+      # says which lines were lost and the report the analysis job reads.
+      # `--fail-under=0` here overrides the configured floor for these two steps
+      # only; the step that actually holds it comes last, after the upload.
+      - name: the table
+        run: |
+          {
+            echo '### Coverage'
+            echo
+            echo '```'
+            uv run --no-sync coverage report --fail-under=0
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: xml, for the analysis job
+        run: uv run --no-sync coverage xml --fail-under=0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: error
+          retention-days: 1
+      # `fail_under` lives in pyproject, so the floor is the same number locally
+      # and here. It is a floor and not a target: it is raised when the real
+      # number rises, and never lowered to let a change through.
+      - name: hold the floor
+        run: uv run --no-sync coverage report
+
+  sonar:
+    name: SonarQube Cloud
+    runs-on: ubuntu-latest
+    needs: [coverage-report]
+    steps:
+      # Sonar attributes findings to the commit that introduced them, which it
+      # reads out of the history -- a shallow clone silently makes every line
+      # "new".
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: coverage-xml
+      - name: Is the scan configured?
+        id: guard
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=SonarQube Cloud not configured::\
+          SONAR_TOKEN is not set on this repository, so the analysis was skipped. \
+          Add the token from https://sonarcloud.io as a repository secret to turn it on."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: scan
+        if: steps.guard.outputs.configured == 'true'
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+  build:
+    name: build + package contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          # A job that produces artifacts does not read a shared cache: a
+          # poisoned entry would travel into something other people install.
+          enable-cache: false
+      - run: uv build
+      # Three claims the wheel itself has to answer for, checked by opening it
+      # rather than by trusting the file that was supposed to produce it.
+      - name: the wheel must carry py.typed and declare no dependencies
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import sys
+          import zipfile
+
+          wheel = next(pathlib.Path("dist").glob("*.whl"))
+          archive = zipfile.ZipFile(wheel)
+          names = archive.namelist()
+
+          if "lovely_assertions/py.typed" not in names:
+              sys.exit(f"py.typed is missing from {wheel.name}: {names}")
+
+          metadata_name = next(n for n in names if n.endswith(".dist-info/METADATA"))
+          metadata = archive.read(metadata_name).decode("utf-8")
+          requires = [
+              line for line in metadata.splitlines() if line.startswith("Requires-Dist:")
+          ]
+          if requires:
+              sys.exit(f"zero runtime dependencies is a contract, but {wheel.name} declares {requires}")
+
+          print(f"{wheel.name}: py.typed present, Requires-Dist empty")
+          PY
+      # The README is the PyPI project page. A directive PyPI's renderer rejects
+      # is not visible anywhere until the upload is refused.
+      - name: metadata renders on PyPI
+        run: uvx twine==7.0.0 check --strict dist/*
+      # Catches the packaging mistakes a passing test suite cannot see: a stray
+      # top-level module, a test package shipped into site-packages, a wheel
+      # whose contents do not match its name.
+      - name: wheel contents
+        run: uvx check-wheel-contents==0.6.3 dist/*.whl
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  commits:
+    name: conventional commits
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    # Two checks here, and only one of them guards `main`.
+    #
+    # Merges are squash-only and the squashed commit takes its subject from the
+    # **pull request title** -- so the title is the sentence that lands, and the
+    # one `CHANGELOG.md` is generated from. A title that is not a Conventional
+    # Commit is dropped from the changelog entirely by `filter_unconventional`,
+    # silently. That check is the load-bearing one.
+    #
+    # The per-commit check is for the reviewer rather than for `main`: the
+    # subjects are discarded by the squash, but somebody reads them one at a
+    # time first, and the etiquette asks for them to be written for a reader.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # A plain bash gate rather than a third-party action: nothing extra to pin,
+      # audit or trust for eleven lines of regex.
+      #
+      # Commit subjects are attacker-controlled text on a fork PR, so they reach
+      # the shell through a file and a loop variable, never through `${{ }}`
+      # interpolation into the script body.
+      # The title is attacker-controlled text on a fork's pull request, so it
+      # reaches the shell through `env:` and a quoted variable, never through
+      # `${{ }}` interpolation into the script body.
+      - name: the pull request title is a Conventional Commit
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._/-]+\))?!?: .+'
+          if ! printf '%s' "$PR_TITLE" | grep -Eq "$pattern"; then
+            printf '::error::the pull request title becomes the commit subject on main and the changelog entry, and this one is not a Conventional Commit: %s\n' "$PR_TITLE"
+            exit 1
+          fi
+          if printf '%s' "$PR_TITLE" | grep -Eq '\.$'; then
+            printf '::error::a changelog entry is a title, not a sentence -- drop the full stop: %s\n' "$PR_TITLE"
+            exit 1
+          fi
+          printf 'title lands as: %s\n' "$PR_TITLE"
+      - name: every commit subject is a Conventional Commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._/-]+\))?!?: .+'
+          failed=0
+          git log --no-merges --format=%s "$BASE_SHA..$HEAD_SHA" > subjects.txt
+          while IFS= read -r subject; do
+            [ -n "$subject" ] || continue
+            if ! printf '%s' "$subject" | grep -Eq "$pattern"; then
+              printf '::error::not a Conventional Commit: %s\n' "$subject"
+              failed=1
+            elif printf '%s' "$subject" | grep -Eq '\.$'; then
+              printf '::error::a commit subject is a changelog entry, not a sentence -- drop the full stop: %s\n' "$subject"
+              failed=1
+            fi
+          done < subjects.txt
+          exit "$failed"
+
+  # One required status check. `needs` lists every real job, so branch protection
+  # never has to enumerate the matrix -- add a job above and add it here.
+  # PR-only gates are tolerated as "skipped" on a push to main.
+  ci-success:
+    name: CI success
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint, types, test, coverage, coverage-report, sonar, build, commits]
+    steps:
+      - name: what each gate reported
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: printf '%s\n' "$RESULTS"
+      # An expression rather than a grep over the JSON: the required check is the
+      # one thing branch protection reads, and it must not depend on the exact
+      # spacing GitHub happens to render `toJSON` with. `skipped` is deliberately
+      # tolerated -- that is what a PR-only gate reports on a push to main.
+      - name: fail if any gate did not pass
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::at least one gate did not pass -- see the job list above"
+          exit 1
+      - name: all gates green
+        run: echo "all gates green"

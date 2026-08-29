@@ -1,0 +1,15 @@
+# Every path, one owner. A ruleset on `main` requires a review from a code owner
+# on every pull request, so this file is what makes "reviewed before it lands"
+# mean something rather than being a setting nobody is named by.
+#
+# The last matching pattern wins, so the catch-all comes first and anything
+# needing a different owner goes below it.
+* @AymericP
+
+# The three files that decide what the pipeline is allowed to do, and the one
+# that decides what gets published. Listed separately not because the owner
+# differs but because a diff here deserves reading twice: a change to a workflow
+# or to the publishing configuration changes what runs with write access.
+/.github/            @AymericP
+/pyproject.toml      @AymericP
+/uv.lock             @AymericP

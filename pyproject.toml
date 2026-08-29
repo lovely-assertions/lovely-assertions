@@ -1,0 +1,348 @@
+[project]
+name = "lovely-assertions"
+dynamic = ["version"]
+description = "Fluent, strictly-typed assertions for Python tests: typed discoverability, real narrowing, and failure messages that explain themselves."
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Aymeric Pasco" }]
+keywords = ["assertions", "testing", "pytest", "fluent", "typing", "type-safe"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Software Development :: Testing",
+    "Framework :: Pytest",
+    "Typing :: Typed",
+]
+# Zero runtime dependencies, permanently. This package is installed into test
+# suites that already carry their own trees; adding to theirs is a cost they
+# did not choose.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/lovely-assertions/lovely-assertions"
+Repository = "https://github.com/lovely-assertions/lovely-assertions"
+Changelog = "https://github.com/lovely-assertions/lovely-assertions/blob/main/CHANGELOG.md"
+Issues = "https://github.com/lovely-assertions/lovely-assertions/issues"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pyright>=1.1.411",
+    "pytest>=8.4",
+    "pytest-cov>=7.0",
+    # 0.15.8 and not 0.15: `S603`'s heuristics changed there, and before it ruff
+    # flags a `subprocess.run` whose argv is entirely string literals. The
+    # weekly lowest-resolution job runs the whole gate at these numbers, so a
+    # floor here is a claim that gets tested rather than a guess.
+    "ruff>=0.15.8",
+    # Windows ships no IANA time zone database, so `zoneinfo` there falls back to
+    # this package and raises without it. Linux and macOS answer from the system
+    # copy, which is why the marker is on it rather than installing a second one
+    # everywhere. Test-only: the library never imports `zoneinfo`, or `datetime`.
+    "tzdata>=2024.1 ; sys_platform == 'win32'",
+]
+
+# Fuzzing, in its own group rather than in `dev`: atheris is a native extension
+# that instruments the interpreter, and every ordinary `uv sync` would build or
+# download it for a job that never fuzzes. `uv sync --group fuzz` opts in.
+# atheris publishes manylinux x86_64 wheels and nothing else, and it is a native
+# extension that instruments the interpreter, so there is no source build to fall
+# back on. The marker is what keeps `uv sync --group fuzz` working on a
+# maintainer's macOS or Windows machine instead of failing to resolve; the fuzz
+# job runs on Linux, which is where the wheels are.
+fuzz = [
+    "atheris>=3.1 ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# One source of truth for the version: the module says it, the wheel takes it
+# from there, and `tests/test_packaging.py` fails if the two ever disagree.
+[tool.hatch.version]
+path = "src/lovely_assertions/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lovely_assertions"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "typing_tests", "scripts", "benchmarks", "fuzz", "README.md", "CHANGELOG.md", "LICENSE"]
+
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests", "typing_tests", "scripts", "benchmarks", "fuzz"]
+
+[tool.ruff.lint]
+select = [
+    "A",    # flake8-builtins
+    "ANN",  # flake8-annotations           (the public API is 100% annotated)
+    "ARG",  # flake8-unused-arguments
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "E",    # pycodestyle errors
+    "EM",   # flake8-errmsg
+    "F",    # pyflakes
+    "FLY",  # flynt
+    "I",    # isort
+    "ICN",  # flake8-import-conventions
+    "INP",  # flake8-no-pep420
+    "ISC",  # flake8-implicit-str-concat
+    "N",    # pep8-naming
+    "PERF", # perflint
+    "PIE",  # flake8-pie
+    "PL",   # pylint
+    "PT",   # flake8-pytest-style
+    "PTH",  # flake8-use-pathlib
+    "RET",  # flake8-return
+    "RSE",  # flake8-raise
+    "RUF",  # ruff-specific
+    "S",    # flake8-bandit
+    "SIM",  # flake8-simplify
+    "SLF",  # flake8-self
+    "SLOT", # flake8-slots                 (a subject is allocated per assertion)
+    "T20",  # flake8-print
+    "TC",   # flake8-type-checking         (helps keep imports off the hot path)
+    "TID",  # flake8-tidy-imports
+    "TRY",  # tryceratops
+    "UP",   # pyupgrade
+    "W",    # pycodestyle warnings
+]
+ignore = [
+    # The failure message is the product, and it is built at the raise site by
+    # design rather than hidden inside an exception subclass.
+    "EM101",
+    "EM102",
+    "TRY003",
+]
+# flake8-boolean-trap is deliberately absent: it flags boolean *flag* arguments,
+# but here `expect(True)` and `def expect(value: bool, /)` are the subject itself.
+# The rule would fire on the API's whole reason to exist.
+
+[tool.ruff.lint.per-file-ignores]
+# Every code below is load-bearing, and that is checked rather than assumed:
+# dropping any one of them produces a diagnostic at the *oldest* ruff this
+# project claims to support as well as at the newest. A rule can be silent at one
+# version and not the other -- `S603`'s heuristics changed, and `PLR0917` only
+# arrived later -- so an entry that looks dead today may be the only reason the
+# floor holds. Each code carries the property of *these* files that makes the
+# rule wrong here; a code with no reason of its own gets removed, not inherited.
+"benchmarks/**" = [
+    "T201",   # a report that cannot print is not a report
+    "S603",   # the one subprocess call is `sys.executable` with an argv it builds itself
+]
+"scripts/**" = [
+    "T201",   # a generator that cannot print is not a generator
+    "S603",   # same shape: `sys.executable`, a fixed argv, no caller input anywhere near it
+]
+"src/lovely_assertions/_names.py" = [
+    # Recovering a name is a sequence of ways to give up. Each early return is a
+    # distinct reason the answer would be a guess, and folding them together
+    # would hide which one applied.
+    "PLR0911",
+]
+"src/lovely_assertions/_subjects.py" = [
+    # The dispatch chain has one branch per subject; that is the table it exists
+    # to be, and folding it into fewer returns would only hide it.
+    "PLR0911",
+]
+"tests/**" = [
+    "S101",    # bare `assert` is the point of a test suite
+    "SLF001",  # tests legitimately poke at private state
+    "PLR2004", # magic values are fine in test expectations
+    "ANN401",  # test doubles are deliberately dynamic
+    "ARG002",  # ditto: a stub's unused parameters are the point
+    "PLC0415", # importing inside a test keeps the fixture's scope explicit
+    "PT012",   # aggregating blocks need more than one statement under `raises`
+]
+"tests/test_happy_path.py" = [
+    # `_message_form` is a classifier: one early return per form of message
+    # building, each naming the form it found. Folding them together would hide
+    # which one applied, which is the whole content of the failure message.
+    "PLR0911",
+]
+"typing_tests/**" = [
+    "ANN401",  # a probe that accepts anything is how the widest overload is reached
+    "B018",    # "useless expression": a type probe is an expression on purpose
+    "INP001",  # checker corpora, deliberately not importable packages
+    "PLR0913", # a probe takes one parameter per type it probes
+    "PLR0917", # and they are positional, for the same reason
+    "PLR2004", # the literals in a probe are the types being probed, not magic values
+]
+"typing_tests/negative/**" = [
+    # This corpus exists to be rejected. Its errors are the assertion.
+    "F821",
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.isort]
+known-first-party = ["lovely_assertions"]
+
+
+# ---------------------------------------------------------------------------
+# pyright -- the reference checker
+# ---------------------------------------------------------------------------
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.13"
+# typing_tests/negative is *supposed* to fail, so it is left out of `include`
+# rather than put in `exclude`: an excluded file stays excluded even when passed
+# on the command line, which would silently neuter the harness in
+# tests/test_typing_surface.py.
+include = ["src", "tests", "typing_tests/positive", "scripts", "benchmarks", "fuzz"]
+exclude = ["**/__pycache__", ".venv"]
+# The Atheris drivers, and only those. They import a module with manylinux
+# x86_64 wheels and no others, so it is absent wherever the checkers run -- and
+# every decision they could get wrong lives in `fuzz/properties.py`, which is
+# checked like anything else. `ignore` rather than `exclude`: the files stay
+# parsed, so a syntax error in one is still an error.
+ignore = ["fuzz/fuzz_*.py"]
+reportMissingTypeStubs = true
+# Keep the two checkers strictly independent: a `# type: ignore` written for
+# mypy must never silence pyright, or we would mask real pyright errors.
+enableTypeIgnoreComments = false
+# The documented ignore list must stay honest: a stale `# pyright: ignore` is an
+# error, so an entry cannot outlive the divergence it covers.
+reportUnnecessaryTypeIgnoreComment = "error"
+# PEP 698 is required of `src` only, below, and the scoping is the argument
+# rather than a concession -- see `executionEnvironments`.
+
+# PEP 698, on the library and not on the corpora that test it.
+#
+# The hazard it closes is specific to a package shaped like this one: a deep
+# single-inheritance subject hierarchy in which a base method *is* the contract.
+# `Expect._fail` is overridden in two places and `_Matcher.matches` in nine;
+# rename or retype one of those bases and every override quietly becomes a new
+# method nothing calls -- a green suite and a broken subject. Sixty-eight methods
+# in `src` say `@override` now, and the decorator returns the same function
+# object, so it costs nothing at runtime.
+#
+# In `tests` and `typing_tests` the same rule fires 173 times, and 144 of those
+# are `__repr__`, `__eq__` and `__hash__` against `object` on a test double whose
+# whole purpose is to define them. `object.__repr__` is not going to be renamed.
+# A rule that is 83% noise where it applies stops being read, so it is asked
+# where it means something.
+[[tool.pyright.executionEnvironments]]
+root = "src"
+reportImplicitOverride = "error"
+
+
+# ---------------------------------------------------------------------------
+# mypy -- matrixed strict beside pyright. Where the two genuinely disagree the
+#         divergence is lived with, never worked around by shaving the API.
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.13"
+files = ["src", "tests", "typing_tests/positive", "scripts", "benchmarks", "fuzz"]
+strict = true
+# Same honesty rule as pyright's reportUnnecessaryTypeIgnoreComment.
+warn_unused_ignores = true
+warn_unreachable = true
+enable_error_code = [
+    "redundant-expr",
+    "possibly-undefined",
+    "truthy-bool",
+    "ignore-without-code",
+]
+
+# PEP 698, matching pyright's `reportImplicitOverride` above and scoped for the
+# same reason: the rule is about the library's own inheritance hierarchy.
+[[tool.mypy.overrides]]
+module = ["lovely_assertions.*"]
+enable_error_code = ["explicit-override"]
+
+# The Atheris drivers, for the reason given under `[tool.pyright]`: the module
+# they import has manylinux x86_64 wheels and no others, so it is absent
+# wherever the checkers run. `fuzz/properties.py` carries all the logic and is
+# checked normally.
+# Named one at a time because mypy only accepts `*` as a whole component, and
+# because the failure mode of forgetting one is the right way round: a new
+# driver that is not listed fails on the missing import, loudly, and the fix is
+# to add it here.
+[[tool.mypy.overrides]]
+module = ["fuzz.fuzz_equality", "fuzz.fuzz_strings", "fuzz.fuzz_hostile"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["atheris"]
+ignore_missing_imports = true
+
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+# The repo root, so the invariant tests can import the measurement primitive
+# from `benchmarks` rather than the benchmarks importing from `tests`.
+pythonpath = ["."]
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "typing: runs a real type checker in a subprocess (slow)",
+]
+
+
+# ---------------------------------------------------------------------------
+# coverage
+# ---------------------------------------------------------------------------
+# Coverage is opt-in (`pytest --cov`), never in `addopts`. Tracing changes what
+# the interpreter does, and the performance invariants know it: a handful of
+# them read a measurement that cannot be taken while `sys.settrace` is active
+# and skip themselves. Making every local run a traced run would silently
+# retire those tests. CI therefore runs the suite twice -- once plain, once
+# measured -- and neither run is the other's substitute.
+[tool.coverage.run]
+branch = true
+source = ["src/lovely_assertions"]
+# Every row of the OS matrix writes its own data file and CI combines them, so
+# the reported number is the union of what CI actually ran rather than one
+# runner's view. Without this the second upload would overwrite the first.
+parallel = true
+relative_files = true
+
+[tool.coverage.paths]
+# The same module is recorded under a different absolute path on each runner,
+# and on Windows with the other separator. `combine` needs telling that these
+# are one file, or it reports three half-covered copies.
+source = [
+    "src/lovely_assertions",
+    "*/src/lovely_assertions",
+    '*\src\lovely_assertions',
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Two decimal places, because the floor below is not an integer and a report
+# that rounds 99.4 to 99 cannot show a floor being approached.
+precision = 2
+# A floor, not a target. It sits just under what the suite actually reaches, so
+# that losing a test is a build failure rather than several points of slack
+# nobody notices spending. The gap that is left is for the platform: CI takes
+# the union of three runners, and a branch only one of them can execute is
+# covered there and missing here. Raise it when the real number rises; never
+# lower it to make a change pass -- write the test instead.
+fail_under = 99
+exclude_also = [
+    # Neither of these is code. A `TYPE_CHECKING` block exists for the checkers
+    # and is false at runtime by construction; an `@overload` body is a
+    # signature declaration whose `...` is never executed. Counting them as
+    # missed would push the report to measure the wrong thing.
+    "^if TYPE_CHECKING:$",
+    "^\\s*@overload$",
+]

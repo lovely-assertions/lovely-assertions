@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question, or "how do I assert this?"
+    url: https://github.com/lovely-assertions/lovely-assertions/discussions
+    about: Ask in Discussions. If the answer turns out to be missing from the guides, that is a docs bug and worth an issue.
+  - name: Security vulnerability
+    url: https://github.com/lovely-assertions/lovely-assertions/security/advisories/new
+    about: Report privately. Please do not open a public issue for a security problem.

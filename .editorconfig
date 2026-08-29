@@ -1,0 +1,23 @@
+# https://editorconfig.org -- the floor `ruff format` builds on, for the files
+# ruff does not touch.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.py]
+indent_size = 4
+max_line_length = 100
+
+[*.{yml,yaml,toml,json}]
+indent_size = 2
+
+[*.md]
+indent_size = 2
+# A Markdown line ending in two spaces is a hard line break. Stripping it
+# silently changes the rendered page.
+trim_trailing_whitespace = false

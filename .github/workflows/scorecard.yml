@@ -1,0 +1,49 @@
+name: Scorecard
+
+# OpenSSF Scorecard grades the repository's own supply-chain posture -- branch
+# protection, pinned actions, token permissions, signed releases -- and files
+# what it finds as code-scanning alerts. It reports on things no test can:
+# settings, not source.
+#
+# Requires a public repository. On a private one the analysis has no data to
+# read and the job fails.
+
+on:
+  branch_protection_rule:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "29 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analysis:
+    name: analysis
+    runs-on: ubuntu-latest
+    # Scorecard grades a repository from what it can read *publicly* -- branch
+    # protection, releases, the workflow files themselves. On a private
+    # repository there is nothing for it to read and the run fails, so it waits
+    # rather than being permanently red.
+    if: github.event.repository.visibility == 'public'
+    permissions:
+      contents: read
+      security-events: write
+      # Publishes the result to the OpenSSF transparency log, which is what
+      # backs the badge in the README.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          publish_results: true
+      - uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          sarif_file: scorecard.sarif
+          category: scorecard
