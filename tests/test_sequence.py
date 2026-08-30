@@ -24,7 +24,9 @@ from typing import TYPE_CHECKING, Final, cast
 
 import pytest
 
+from _happy_calls import declared_by_the_subject
 from lovely_assertions import AssertionFailure, Found, SequenceExpect, expect
+from lovely_assertions._sequence import _pairs
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -220,7 +222,7 @@ def test_does_not_have_same_length_as() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Ordered equality
+# Sortable equality
 # ---------------------------------------------------------------------------
 def test_equals_sequence_compares_items_not_collections() -> None:
     """A list equals the tuple with the same contents: the subject is a Sequence."""
@@ -1520,9 +1522,9 @@ def test_the_nan_ordering_note_is_the_wording_the_ordered_subject_uses() -> None
     The note is restated in ``_sequence`` rather than imported, because the name
     is private to ``_ordered``. This is what keeps the copy honest.
     """
-    from lovely_assertions import _ordered, _sequence
+    from lovely_assertions import _ordered
 
-    stated = _sequence._NAN_ORDERING_NOTE  # pyright: ignore[reportPrivateUsage]
+    stated = _pairs._NAN_ORDERING_NOTE  # pyright: ignore[reportPrivateUsage]
     assert stated == _ordered._NAN_OPERAND_NOTE  # pyright: ignore[reportPrivateUsage]
     assert stated == NAN_ORDERING_NOTE
 
@@ -1663,7 +1665,7 @@ def test_the_because_table_has_not_fallen_behind_the_catalogue() -> None:
     covered = {parameters.id for parameters in BECAUSE_CALLS}
     declared = {
         name
-        for name, attribute in vars(SequenceExpect).items()
+        for name, attribute in declared_by_the_subject(SequenceExpect).items()
         if not name.startswith("_") and callable(attribute)
     } - NOT_ASSERTIONS
     assert covered == declared
@@ -1671,4 +1673,4 @@ def test_the_because_table_has_not_fallen_behind_the_catalogue() -> None:
 
 def test_everything_excused_from_the_because_table_really_is_declared() -> None:
     """The excuse list cannot outlive what it excuses, or it starts hiding regressions."""
-    assert set(vars(SequenceExpect)) >= NOT_ASSERTIONS
+    assert set(declared_by_the_subject(SequenceExpect)) >= NOT_ASSERTIONS

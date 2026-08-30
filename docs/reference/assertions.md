@@ -745,10 +745,10 @@ anything; the rest of the catalogue is inherited from the collection subject.
 
 **Ordering**
 
-- `is_sorted(*, key: Callable[[E], _Ordered] | None = None, because: str = "") -> Self` — Assert the items are in non-decreasing order.
-- `is_not_sorted(*, key: Callable[[E], _Ordered] | None = None, because: str = "") -> Self` — Assert some item comes before one it should follow.
-- `is_sorted_descending(*, key: Callable[[E], _Ordered] | None = None, because: str = "") -> Self` — Assert the items are in non-increasing order.
-- `is_not_sorted_descending(*, key: Callable[[E], _Ordered] | None = None, because: str = "") -> Self` — Assert the items are not in non-increasing order.
+- `is_sorted(*, key: Callable[[E], Sortable] | None = None, because: str = "") -> Self` — Assert the items are in non-decreasing order.
+- `is_not_sorted(*, key: Callable[[E], Sortable] | None = None, because: str = "") -> Self` — Assert some item comes before one it should follow.
+- `is_sorted_descending(*, key: Callable[[E], Sortable] | None = None, because: str = "") -> Self` — Assert the items are in non-increasing order.
+- `is_not_sorted_descending(*, key: Callable[[E], Sortable] | None = None, because: str = "") -> Self` — Assert the items are not in non-increasing order.
 
 **Projection**
 
