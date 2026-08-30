@@ -168,6 +168,44 @@ def test_zero_runtime_dependencies() -> None:
     assert pyproject["project"]["dependencies"] == []
 
 
+def test_no_dependency_is_installed_by_building_a_source_distribution() -> None:
+    """Every development dependency ships a wheel, so no setup script ever runs.
+
+    Installing a source distribution executes its build code -- ``setup.py``, or a
+    backend hook -- with the privileges of whoever ran the install, which on a CI
+    runner means a token. Installing a wheel unpacks an archive and does not.
+
+    So the property worth holding is that nothing in the resolved tree *can* be
+    built: not that the build is sandboxed, but that there is no build. That is
+    true today, and it is the kind of thing that stops being true when somebody
+    adds a dependency and nobody looks -- which is what this reads out of the lock
+    rather than trusting.
+
+    An ordinary ``uv sync --no-build`` cannot enforce it: the project installs
+    itself as an editable, which has no wheel by definition, so the flag rejects
+    the very tree it is meant to protect. The release workflow *can* ask for it,
+    because it syncs with ``--no-install-project`` -- but that is one job, and it
+    reports at the end of a tag push. The lock is where the answer lives for
+    everybody else, at review time.
+    """
+    lock = (REPO_ROOT / "uv.lock").read_text(encoding="utf-8")
+    project_name = "lovely-assertions"
+
+    sdist_only: list[str] = []
+    for block in lock.split("\n[[package]]")[1:]:
+        found = re.search(r'\nname = "([^"]+)"', block)
+        if found is None or found.group(1) == project_name:
+            continue
+        if "\nsdist = {" in block and "\nwheels = [" not in block:
+            sdist_only.append(found.group(1))
+
+    assert not sdist_only, (
+        f"these dependencies would be installed by building a source distribution, "
+        f"which runs their build code: {sorted(sdist_only)}. Pin a version that "
+        f"publishes a wheel, or replace the dependency."
+    )
+
+
 def _module_level_imports(source: str) -> set[str]:
     """Top-level import targets only.
 

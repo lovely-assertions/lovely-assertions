@@ -220,6 +220,13 @@ Add the SonarQube Cloud ones once the project exists there and `SONAR_TOKEN` is
 set as a repository secret — until then the scan job skips itself with a warning
 and these render "Project not found":
 
+> **Turning the CI scan on means turning Automatic Analysis off**, in the
+> project's settings on sonarcloud.io. The two modes are mutually exclusive, and
+> only the CI scan reads `sonar-project.properties`. Under Automatic Analysis the
+> dashboard grades `tests/` and `typing_tests/` as production code, does not
+> honour the `typing_tests/negative/` exclusion, and scans `.github/` — which is
+> why it reports thousands of findings about fixtures. The file has the details.
+
 ```markdown
 [![Quality gate](https://sonarcloud.io/api/project_badges/measure?project=lovely-assertions_lovely-assertions&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=lovely-assertions_lovely-assertions)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=lovely-assertions_lovely-assertions&metric=coverage)](https://sonarcloud.io/summary/new_code?id=lovely-assertions_lovely-assertions)
