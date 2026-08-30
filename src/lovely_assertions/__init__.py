@@ -46,7 +46,7 @@ Zero runtime dependencies, Python 3.13+, ``py.typed``.
 #: It reads ``0.0.0`` because nothing has been published to PyPI yet, and this
 #: line records the last *released* version rather than the next one. The release
 #: pull request is where the next one is proposed.
-__version__ = "0.0.0"  # x-release-please-version
+__version__ = "1.0.0"  # x-release-please-version
 
 from lovely_assertions._core import Expect, Found, SoftScope, soft_assertions
 from lovely_assertions._equivalence import Equivalency, close_within, equivalency
