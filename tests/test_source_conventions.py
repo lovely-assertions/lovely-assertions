@@ -26,9 +26,11 @@ from typing import Final
 
 import pytest
 
+from _package import sources
+
 SRC: Final = Path(__file__).resolve().parent.parent / "src" / "lovely_assertions"
 
-MODULES: Final = sorted(SRC.glob("*.py"))
+MODULES: Final = sources(SRC)
 
 #: Things a reader of the installed package cannot open: design documents and
 #: numbered decisions live in the repository, and the tests and benchmarks are
@@ -103,22 +105,23 @@ def _assertions(path: Path) -> "list[tuple[int, str, str]]":
     return found
 
 
-@pytest.mark.parametrize("module", MODULES, ids=lambda path: path.name)
+@pytest.mark.parametrize("module", MODULES, ids=lambda path: path.relative_to(SRC).as_posix())
 def test_the_shipped_source_cites_nothing_a_reader_cannot_open(module: Path) -> None:
     """No comment or docstring in the wheel points at something outside the wheel."""
+    where = module.relative_to(SRC).as_posix()
     offences = [
-        f"  {module.name}:{lineno}: {line.strip()}"
+        f"  {where}:{lineno}: {line.strip()}"
         for lineno, line in _prose(module)
         if UNREACHABLE.search(line)
     ]
     assert not offences, (
-        f"{module.name} cites something a reader of the installed package cannot open:\n"
+        f"{where} cites something a reader of the installed package cannot open:\n"
         + "\n".join(offences)
         + "\nWrite the idea itself in a sentence or two instead of pointing at it."
     )
 
 
-@pytest.mark.parametrize("module", MODULES, ids=lambda path: path.name)
+@pytest.mark.parametrize("module", MODULES, ids=lambda path: path.relative_to(SRC).as_posix())
 def test_every_suppression_says_why(module: Path) -> None:
     """A silenced lint rule says why, in plain language, where the reader will look.
 
@@ -127,22 +130,23 @@ def test_every_suppression_says_why(module: Path) -> None:
     the next reader has a rule number and no way to tell whether the exemption
     still applies, so it is never removed and the rule stays off for good.
     """
+    where = module.relative_to(SRC).as_posix()
     explained = {lineno for lineno, line in _prose(module) if line.lstrip().startswith("#")}
     offences = [
-        f"  {module.name}:{lineno}: {line.strip()}"
+        f"  {where}:{lineno}: {line.strip()}"
         for lineno, line in _prose(module)
         if "# noqa:" in line
         and "(" not in line.partition("# noqa:")[2]
         and lineno - 1 not in explained
     ]
     assert not offences, (
-        f"{module.name} silences a lint rule without saying why:\n"
+        f"{where} silences a lint rule without saying why:\n"
         + "\n".join(offences)
         + "\nPut the reason in parentheses after the rule code, or in a comment above the line."
     )
 
 
-@pytest.mark.parametrize("module", MODULES, ids=lambda path: path.name)
+@pytest.mark.parametrize("module", MODULES, ids=lambda path: path.relative_to(SRC).as_posix())
 def test_every_assertion_opens_with_the_claim_it_makes(module: Path) -> None:
     """An assertion's first docstring line is one sentence beginning "Assert".
 
@@ -150,13 +154,14 @@ def test_every_assertion_opens_with_the_claim_it_makes(module: Path) -> None:
     the generated catalogue carries, so it has to stand alone and it has to read
     as a claim about the subject rather than as a note about the method.
     """
+    where = module.relative_to(SRC).as_posix()
     offences = [
-        f"  {module.name}:{lineno} {name}: {first!r}"
+        f"  {where}:{lineno} {name}: {first!r}"
         for lineno, name, first in _assertions(module)
         if not first.startswith("Assert ") or not first.endswith(".")
     ]
     assert not offences, (
-        f"{module.name} documents an assertion as something other than a claim:\n"
+        f"{where} documents an assertion as something other than a claim:\n"
         + "\n".join(offences)
         + '\nOpen with "Assert ..." and end the first line with a full stop.'
     )

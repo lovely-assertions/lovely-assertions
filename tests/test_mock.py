@@ -42,6 +42,7 @@ from unittest.mock import (
 import pytest
 from benchmarks import blocks_allocated
 
+from _package import sources
 from lovely_assertions import AssertionFailure, SequenceExpect, expect, soft_assertions
 from lovely_assertions import _mock as mock_module
 from lovely_assertions._exceptions import hide_internal_frames
@@ -1146,16 +1147,26 @@ def test_unittest_mock_is_never_imported_anywhere_in_the_module() -> None:
     ``re`` and friends. This one is stronger, because the cost here is not a
     failure-path import but an import that a session with no mocks in it would
     pay for nothing.
+
+    Reads every file the subject is made of rather than the one
+    ``__file__`` names: were the subject ever a package, that one file would be
+    its ``__init__``, and the claim would silently shrink to whichever imports
+    happened to live there.
     """
-    source = Path(mock_module.__file__).read_text(encoding="utf-8")
-    imported: set[str] = set()
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Import):
-            imported.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module is not None:
-            imported.add(node.module)
-    offenders = sorted(name for name in imported if name.partition(".")[0] == "unittest")
-    assert not offenders, f"_mock.py imports {offenders}; it does not need to"
+    module_path = Path(mock_module.__file__)
+    files = sources(module_path.parent) if module_path.name == "__init__.py" else [module_path]
+    offenders: dict[str, list[str]] = {}
+    for path in files:
+        imported: set[str] = set()
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                imported.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module is not None:
+                imported.add(node.module)
+        found = sorted(name for name in imported if name.partition(".")[0] == "unittest")
+        if found:
+            offenders[path.relative_to(module_path.parent).as_posix()] = found
+    assert not offenders, f"the mock subject imports {offenders}; it does not need to"
 
 
 def test_importing_the_library_does_not_pull_unittest_mock_in() -> None:

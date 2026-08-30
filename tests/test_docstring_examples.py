@@ -21,16 +21,12 @@ from typing import Final
 import pytest
 
 import lovely_assertions
+from _package import module_name, sources
 
 SRC: Final = Path(lovely_assertions.__file__).parent
 
 #: Every module in the package, by import name.
-MODULES: Final = [
-    *sorted(
-        f"lovely_assertions.{path.stem}" for path in SRC.glob("*.py") if path.stem != "__init__"
-    ),
-    "lovely_assertions",
-]
+MODULES: Final = sorted({module_name(path, SRC) for path in sources(SRC)})
 
 #: What every example may use without importing it: the package's public API,
 #: exactly as ``from lovely_assertions import ...`` would give it. A module's own

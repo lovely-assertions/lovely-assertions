@@ -23,6 +23,7 @@ from typing import Final, Generic
 
 import lovely_assertions
 from _happy_calls import library_modules
+from _package import sources
 from lovely_assertions import AssertionFailure
 
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
@@ -262,11 +263,11 @@ def test_no_module_level_import_of_failure_path_modules() -> None:
     """
     package_dir = Path(lovely_assertions.__file__).parent
     offenders: dict[str, list[str]] = {}
-    for module_path in sorted(package_dir.rglob("*.py")):
+    for module_path in sources(package_dir):
         eager = _module_level_imports(module_path.read_text(encoding="utf-8"))
         found = sorted(eager.intersection(DEFERRED_MODULES))
         if found:
-            offenders[module_path.name] = found
+            offenders[module_path.relative_to(package_dir).as_posix()] = found
     assert not offenders, (
         f"module-level imports of failure-path modules: {offenders}. "
         f"Move them inside the function that uses them."

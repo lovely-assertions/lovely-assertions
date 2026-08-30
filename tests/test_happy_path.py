@@ -102,6 +102,7 @@ from _happy_calls import (
     SUBJECT_CLASSES,
     World,
 )
+from _package import sources
 from conftest import Detonator
 from lovely_assertions import expect
 
@@ -298,7 +299,8 @@ _EXEMPT_EDGES: Final[dict[tuple[str, str], str]] = {
 def _library_sources() -> dict[str, str]:
     package_dir = Path(lovely_assertions.__file__).parent
     return {
-        path.name: path.read_text(encoding="utf-8") for path in sorted(package_dir.rglob("*.py"))
+        path.relative_to(package_dir).as_posix(): path.read_text(encoding="utf-8")
+        for path in sources(package_dir)
     }
 
 

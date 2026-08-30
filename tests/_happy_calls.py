@@ -57,6 +57,7 @@ from unittest.mock import Mock
 import pytest
 
 import lovely_assertions
+from _package import module_name, sources
 from lovely_assertions import (
     Expect,
     MockExpect,
@@ -73,10 +74,9 @@ from lovely_assertions._datetime import WithinDelta
 def library_modules() -> list[ModuleType]:
     """Every module in the package, the package itself included."""
     package = Path(lovely_assertions.__file__).parent
-    return [lovely_assertions] + [
-        import_module(f"lovely_assertions.{path.stem}")
-        for path in sorted(package.rglob("*.py"))
-        if path.stem != "__init__"
+    return [
+        import_module(name)
+        for name in sorted({module_name(path, package) for path in sources(package)})
     ]
 
 
