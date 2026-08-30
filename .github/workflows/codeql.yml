@@ -43,10 +43,27 @@ jobs:
         with:
           languages: python
           build-mode: none
-          # `security-and-quality` over the default `security-extended`: this is
-          # a library whose product is its correctness, so the quality queries
-          # are worth reading rather than noise to be filtered.
-          queries: security-and-quality
+          # `security-extended` rather than `security-and-quality`, which this
+          # file used to ask for on the theory that a correctness-critical
+          # library should read the quality queries too. It was tried, and the
+          # theory did not survive contact: the quality half reported hundreds
+          # of findings and not one of them carried a security severity or a
+          # `security` tag. They were the same handful of misreadings repeated
+          # -- `...` in an `@overload` body called an ineffectual statement, a
+          # `TYPE_CHECKING` import called unused and then called a cycle, a
+          # PEP 695 `type` alias called an undefined export, a `NoReturn`
+          # helper ignored so the line after it looked uninitialised, and the
+          # deliberate `value != value` that is what NaN *means*.
+          #
+          # None of that is CodeQL failing at its job. It is CodeQL doing a
+          # linter's job on a codebase whose idiom is modern typing, while
+          # ruff -- a Python-native linter that models `TYPE_CHECKING`,
+          # `@overload` and PEP 695 -- already runs here over a far larger
+          # rule set, `S` for bandit included, and gates every pull request.
+          # `security-extended` keeps every security query, including the
+          # lower-precision ones the default suite leaves out, and drops the
+          # duplicated linting. An alert on this tab should mean something.
+          queries: security-extended
       - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           category: "/language:python"
