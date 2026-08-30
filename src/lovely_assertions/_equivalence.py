@@ -91,18 +91,20 @@ reporting path only, never during the walk.
 Two house rules show up in the shape of the code. A message is never built outside
 the argument list of a ``_fail(...)`` call, and there is no ``_fail`` here, so
 there are no f-strings either: every message is concatenated, exactly as in
-``_diff.py``, ``_formatters.py`` and ``_formatting.py``. And nothing a passing
+``_diff``, ``_formatters.py`` and ``_formatting.py``. And nothing a passing
 assertion would pay for is imported at module scope -- ``dataclasses`` is imported
 inside the function that needs it, ``attrs`` is duck-typed through
 ``__attrs_attrs__`` with nothing imported at all, and pydantic v2 keeps its field
 values in ``__dict__`` and needs nothing.
 
-A note on the duplication with ``_diff.py``. Its clipping, counting and item
-rendering are the conventions this module follows, and they are private to it --
-pyright strict refuses ``from lovely_assertions._diff import _clip`` outright
-(``reportPrivateUsage``). Only :func:`~lovely_assertions._diff.render_operand` is
-exported, so that is what is reused; the rest is reimplemented here to the same
-behaviour. Field resolution is not duplicated: both modules read it from
+A note on the duplication with ``_diff``. Its clipping, counting and item
+rendering are the conventions this module follows, and they live in modules that
+package is entered past: only :func:`~lovely_assertions._diff.render_operand`,
+:func:`~lovely_assertions._diff.describe_difference` and
+:func:`~lovely_assertions._diff.stable_order` are exported, and reaching around
+that for a leaf helper would tie this module to an arrangement the diff engine is
+free to change. So ``render_operand`` is reused and the rest is reimplemented
+here to the same behaviour. Field resolution is not duplicated: both modules read it from
 ``_reflection.py``, because two resolvers that drift produce a message that
 contradicts the comparison behind it.
 """

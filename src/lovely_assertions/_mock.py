@@ -108,7 +108,7 @@ __tracebackhide__ = hide_internal_frames
 
 __all__ = ["MockExpect", "is_mock"]
 
-#: One level of a message's detail block, matching ``_diff.py``.
+#: One level of a message's detail block, matching ``_diff``.
 _INDENT = "  "
 
 #: The names every ``unittest.mock`` mock carries, in the order they are asked

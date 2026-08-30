@@ -4,7 +4,7 @@ This file is the flagship assertion's specification written as tests, and it was
 written **against what the library promises rather than against the
 implementation**. A suite written by reading the engine tests that the code does
 what it does; this one tests that it does what it should. Everything here comes
-from that promise, from the conventions ``_diff.py`` already set, and from the
+from that promise, from the conventions ``_diff`` already set, and from the
 three ordering traps -- each of which silently produces a wrong *pass*, which is
 the only kind of bug an assertion library cannot afford.
 
