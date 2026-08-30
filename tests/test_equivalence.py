@@ -29,8 +29,9 @@ from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
 
 import pytest
 
-from lovely_assertions import _equivalence, _reflection, expect, formatting, soft_assertions
+from lovely_assertions import _equivalence, expect, formatting, soft_assertions
 from lovely_assertions._equivalence import Equivalency, close_within, compare, equivalency
+from lovely_assertions._reflection import _cache, _fields
 
 if TYPE_CHECKING:
     from abc import ABCMeta
@@ -2022,7 +2023,7 @@ def test_what_a_type_declares_is_worked_out_once_and_then_remembered(
 
 def test_what_a_types_slots_hold_is_worked_out_once_too() -> None:
     """The other half: an MRO walk per pair, for an answer that belongs to the class."""
-    slots: dict[type, object] = getattr(_reflection, "_SLOTS_BY_TYPE")  # noqa: B009
+    slots: dict[type, object] = getattr(_fields, "_SLOTS_BY_TYPE")  # noqa: B009
     slots.clear()
     assert findings(Slotted("a", 1), Slotted("a", 2)) == ["port: 1 instead of 2"]
     assert Slotted in slots, "the type's slots were resolved and thrown away"
@@ -2034,9 +2035,9 @@ def test_the_type_caches_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     A suite that builds a class per test would grow it without bound, so the miss
     path empties it rather than letting it become a leak with a lookup on top.
     """
-    monkeypatch.setattr(_reflection, "_MAX_CACHED_TYPES", 2)
+    monkeypatch.setattr(_cache, "_MAX_CACHED_TYPES", 2)
     declared: dict[type, object] = getattr(_equivalence, "_DECLARED_BY_TYPE")  # noqa: B009
-    slots: dict[type, object] = getattr(_reflection, "_SLOTS_BY_TYPE")  # noqa: B009
+    slots: dict[type, object] = getattr(_fields, "_SLOTS_BY_TYPE")  # noqa: B009
     routes: dict[type, object] = getattr(_equivalence, "_ROUTE_BY_TYPE")  # noqa: B009
     declared.clear()
     slots.clear()
