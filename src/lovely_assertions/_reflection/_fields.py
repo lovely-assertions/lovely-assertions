@@ -1,36 +1,25 @@
-"""What an object's fields are called, and the predicates that go with the question.
+"""The five ways an object can say what its fields are called.
 
-Two modules need this answer. ``_diff`` needs it to say which field made ``==``
-say no, and ``_equivalence`` needs it to walk two graphs member by member. The
-leaves live here so that there is one answer rather than two, because two
-resolvers that are free to drift produce a failure nobody can spot from the
-outside: report an ``attrs`` field declared ``eq=False`` and the reader is shown
-a difference in a field the object's ``__eq__`` never looked at, under a heading
-that says the objects are unequal. Which resolver is right is not visible in
-either message, and nothing forces them to agree.
+A declaration beats a dictionary: a dataclass, a NamedTuple and an attrs class
+each announce their fields, and each answers alone. ``__slots__`` and the
+instance dictionary are read together rather than raced, because an object often
+has both and a slotted base under a subclass carrying a ``__dict__`` would
+otherwise report half of what it holds.
 
-What is shared is the leaves; each caller keeps its own race over them, and that
-division is the point rather than an accident. The two genuinely want different
-orders, and only ``_equivalence`` needs "declares no fields" to be a distinct
-answer from "declares none", so that a dataclass subclassing ``dict`` falls
-through to its fields instead of to its entries. What neither needs is its own
-idea of what a ``__slots__`` declaration contains.
+Every resolver here is a leaf. The race between them -- which is asked first, and
+what "declares nothing" means -- belongs to the caller, because the two callers
+genuinely want different orders, and only the equivalence walk needs "declares no
+fields" told apart from "is not that kind of thing".
 
-The names here carry no leading underscore, by the rule the package follows
-throughout: a name imported across a module boundary is that module's public
-surface, and spelling it private only obliges its callers to lie.
-
-**Importing this module imports nothing a user would not otherwise pay for.**
-:func:`dataclass_field_names` imports ``dataclasses`` inside itself, so that only
-the caller who actually resolves a dataclass's fields pays for it, and ``attrs``
+Importing this module costs nothing a user would not otherwise pay for.
+``dataclasses`` is imported inside the one function that needs it, and ``attrs``
 is duck-typed through ``__attrs_attrs__`` with nothing imported at all.
 """
 
-from collections.abc import Mapping
-from collections.abc import Set as AbstractSet
-from typing import TYPE_CHECKING, Final, TypeIs, cast
+from typing import TYPE_CHECKING, cast
 
 from lovely_assertions._exceptions import hide_internal_frames
+from lovely_assertions._reflection._cache import UNCACHED, remember
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -40,55 +29,6 @@ if TYPE_CHECKING:
 #: traceback while leaving them in place for a genuine error. See
 #: :func:`lovely_assertions._exceptions.hide_internal_frames`.
 __tracebackhide__ = hide_internal_frames
-
-__all__ = [
-    "attrs_field_names",
-    "dataclass_field_names",
-    "instance_dict_names",
-    "is_float_nan",
-    "is_mapping",
-    "is_set",
-    "named_tuple_field_names",
-    "qualified",
-    "remember",
-    "slot_names",
-]
-
-
-def qualified(subject_type: type, /) -> str:
-    """``package.module.Class``, for when the bare name does not tell them apart."""
-    return subject_type.__module__ + "." + subject_type.__qualname__
-
-
-def is_float_nan(value: object, /) -> bool:
-    """Whether a value is a float NaN, without importing ``math``.
-
-    Deliberately *not* :func:`lovely_assertions._ordered.is_nan`, which asks the
-    same question of a wider world and gets a different answer. That one is the
-    bare ``value != value``, so it recognises a ``Decimal("nan")`` -- which is
-    what the ordering catalogue needs of it -- and so it also answers ``True`` for
-    a ``Mock``, whose ``__eq__`` returns a new mock every time it is asked. A
-    describer that called a mock a NaN would explain a failure with a fact about
-    floating point that has nothing to do with it. Two questions, two names.
-    """
-    return isinstance(value, float) and value != value  # noqa: PLR0124  (that is what NaN means)
-
-
-def is_mapping(value: object, /) -> TypeIs[Mapping[object, object]]:
-    """Whether a value is a mapping, narrowed to what a caller needs to read.
-
-    The two ``is_*`` predicates carry ``TypeIs`` rather than being written as bare
-    ``isinstance`` calls at the call site: an un-parameterised ``isinstance``
-    narrows ``object`` to ``Mapping[Unknown, Unknown]``, and the unknowns then leak
-    into every branch after it. ``Mapping[object, object]`` is a supertype only for
-    reading, which is all either caller ever does with them.
-    """
-    return isinstance(value, Mapping)
-
-
-def is_set(value: object, /) -> TypeIs[AbstractSet[object]]:
-    """Whether a value is a set, narrowed to what a caller needs to read."""
-    return isinstance(value, AbstractSet)
 
 
 def _is_reserved(name: str, /) -> bool:
@@ -180,6 +120,10 @@ def attrs_field_names(value: object, /) -> tuple[str, ...]:
     return tuple(names)
 
 
+#: Slot answers already worked out, keyed by the type asked about.
+_SLOTS_BY_TYPE: dict[type, tuple[str, ...]] = {}
+
+
 def slot_names(subject_type: type, /) -> tuple[str, ...]:
     """Every ``__slots__`` entry the type declares, base classes first.
 
@@ -200,8 +144,8 @@ def slot_names(subject_type: type, /) -> tuple[str, ...]:
     The answer is a property of the class, not of the instance, so there is
     nothing to go stale.
     """
-    cached = _SLOTS_BY_TYPE.get(subject_type, _UNCACHED)
-    if cached is not _UNCACHED:
+    cached = _SLOTS_BY_TYPE.get(subject_type, UNCACHED)
+    if cached is not UNCACHED:
         return cast("tuple[str, ...]", cached)
     names: list[str] = []
     for klass in reversed(subject_type.__mro__):
@@ -227,25 +171,3 @@ def instance_dict_names(value: object, /) -> tuple[str, ...]:
     except TypeError:
         return ()
     return tuple(name for name in members if not _is_reserved(name))
-
-
-#: Sentinel for a cache miss, so that a remembered ``None`` -- a real answer for
-#: the callers that have one -- is told apart from nothing remembered at all.
-_UNCACHED: Final = object()
-
-#: Slot answers already worked out, keyed by the type asked about.
-_SLOTS_BY_TYPE: dict[type, tuple[str, ...]] = {}
-
-#: Types held in a cache before it is emptied. A cache keyed on class objects
-#: keeps every class it has seen alive, and a suite that builds a class per test
-#: would otherwise grow one entry per test for the length of the run. Cleared
-#: wholesale rather than evicted one at a time: the answers are cheap to rebuild
-#: and a policy that has to be right is worse than one that has to be bounded.
-_MAX_CACHED_TYPES: Final = 4096
-
-
-def remember[Answer](cache: dict[type, Answer], subject_type: type, answer: Answer, /) -> None:
-    """Record one type's answer, keeping the cache bounded."""
-    if len(cache) >= _MAX_CACHED_TYPES:
-        cache.clear()
-    cache[subject_type] = answer
