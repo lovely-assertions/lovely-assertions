@@ -115,15 +115,30 @@ def _annotation(node: ast.expr | None) -> str:
 
 
 def _aliases(tree: ast.Module, /) -> dict[str, str]:
-    """The module's PEP 695 aliases, ``{"_DateTime": "datetime"}``.
+    """The PEP 695 aliases a module can see, ``{"DateTime": "datetime"}``.
 
     Only the one-name-to-one-name kind, which is all the subject modules declare
     and all this needs to undo.
+
+    Aliases imported from a sibling are followed. A subject split into one file
+    per seam declares its base in the assembly and the alias in the module that
+    holds the shared root, and an alias exists precisely so a base can name a
+    type the package refuses to import -- publishing the alias name instead of
+    the type would tell a reader to import something that is not there.
     """
     found: dict[str, str] = {}
     for item in tree.body:
         if isinstance(item, ast.TypeAlias) and isinstance(item.value, ast.Name):
             found[item.name.id] = item.value.id
+        elif isinstance(item, ast.ImportFrom):
+            within = (item.module or "").removeprefix("lovely_assertions.")
+            source = SRC / (within.replace(".", "/") + ".py")
+            if within == (item.module or "") or not source.exists():
+                continue
+            declared = _aliases(ast.parse(source.read_text(encoding="utf-8")))
+            found.update(
+                {alias.name: declared[alias.name] for alias in item.names if alias.name in declared}
+            )
     return found
 
 
@@ -858,8 +873,8 @@ TARGETS: list[tuple[str, str, str]] = [
     ("_datetime.py", "DateTimeExpect", "DateTimeExpect"),
     ("_datetime.py", "TimeExpect", "TimeExpect"),
     ("_datetime.py", "TimeDeltaExpect", "TimeDeltaExpect"),
-    ("_path.py", "PurePathExpect", "PurePathExpect[T]"),
-    ("_path.py", "PathExpect", "PathExpect"),
+    ("_path/_purepath.py", "PurePathExpect", "PurePathExpect[T]"),
+    ("_path/__init__.py", "PathExpect", "PathExpect"),
     ("_enum.py", "EnumExpect", "EnumExpect[T]"),
     ("_callable.py", "CallableExpect", "CallableExpect"),
     ("_callable.py", "RaisedExpect", "RaisedExpect[E]"),
@@ -876,6 +891,18 @@ TARGETS: list[tuple[str, str, str]] = [
 #: banner. ``DateTimeExpect`` takes only the clock half: it inherits
 #: ``DateExpect``, which already carries the ordering half.
 SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "PurePathExpect": (
+        ("_path/_names.py", "NameAssertions", "The pieces of a name"),
+        ("_path/_placement.py", "PlacementAssertions", "Absoluteness"),
+    ),
+    "PathExpect": (
+        ("_path/_presence.py", "PresenceAssertions", "Presence"),
+        ("_path/_emptiness.py", "EmptinessAssertions", "Emptiness"),
+        ("_path/_size.py", "SizeAssertions", "Size"),
+        ("_path/_contents.py", "ContentAssertions", "Contents"),
+        ("_path/_entries.py", "EntryAssertions", "Directory entries"),
+        ("_path/_identity.py", "IdentityAssertions", "Identity on disk"),
+    ),
     "SequenceExpect": (
         ("_sequence/_base.py", "SequenceBase", "Message positions"),
         ("_sequence/_equality.py", "EqualityAssertions", "Ordered equality"),

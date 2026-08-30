@@ -30,6 +30,7 @@ from typing import Final
 
 import pytest
 
+from _package import sources
 from lovely_assertions import (
     AssertionFailure,
     Expect,
@@ -40,7 +41,8 @@ from lovely_assertions import (
 )
 from lovely_assertions import _path as _path_module
 from lovely_assertions._exceptions import hide_internal_frames
-from lovely_assertions._path import PathExpect, PurePathExpect, rendered
+from lovely_assertions._path import PathExpect, PurePathExpect, _render
+from lovely_assertions._path._render import rendered
 
 ARCHIVE: Final = PurePosixPath("/var/backups/archive.tar.gz")
 
@@ -816,7 +818,7 @@ def test_a_large_file_gets_no_line_by_line_diff(tmp_path: Path) -> None:
     """``difflib`` over a multi-megabyte fixture would cost more than the test did."""
     fat = tmp_path / "fat.txt"
     fat.write_text("line\n" * 40_000, encoding="utf-8")
-    assert len("line\n" * 40_000) > _path._MAX_DIFFED  # pyright: ignore[reportPrivateUsage]
+    assert len("line\n" * 40_000) > _render._MAX_DIFFED  # pyright: ignore[reportPrivateUsage]
     message = _message(lambda: expect(fat).has_text("nope"))
     assert "the strings differ" not in message
 
@@ -1594,16 +1596,22 @@ def test_every_assertion_pathlib_can_refuse_has_a_refusal_exercise() -> None:
     ``ENOTDIR``, which is one of the four values these methods answer ``False``
     for, so the ``except OSError`` branch is never entered there and could be
     deleted with that table still green.
+
+    Read off every module of the package rather than the one the subject is
+    assembled in. ``inspect.getsource`` on a package hands back its ``__init__``,
+    which declares no assertion at all -- the set below would have come out empty
+    and the comparison would have been against nothing.
     """
     import ast
-    import inspect
 
     answering_false = {"exists", "is_file", "is_dir", "is_symlink"}
-    tree = ast.parse(inspect.getsource(_path_module))
+    package = Path(_path_module.__file__).parent
+    trees = [ast.parse(source.read_text(encoding="utf-8")) for source in sources(package)]
     reachable = {
         node.name
+        for tree in trees
         for klass in ast.walk(tree)
-        if isinstance(klass, ast.ClassDef) and klass.name == "PathExpect"
+        if isinstance(klass, ast.ClassDef)
         for node in klass.body
         if isinstance(node, ast.FunctionDef)
         and not node.name.startswith("_")

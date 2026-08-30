@@ -1099,7 +1099,7 @@ def test_the_builder_set_is_derived_and_not_empty() -> None:
     assert len(builders) > 50
     assert "format_value" in builders
     assert "render_operand" in builders
-    assert {"_clipped", "rendered"} <= builders
+    assert {"clipped", "rendered"} <= builders
 
 
 def test_no_seam_is_ever_handed_back_by_expect() -> None:
