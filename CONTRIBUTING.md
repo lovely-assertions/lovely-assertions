@@ -130,16 +130,26 @@ fix(diff): keep the hunk header honest when the window is clipped
 docs(guides): say what `excluding_missing` actually turns off
 ```
 
-**`CHANGELOG.md` is generated from those subjects** by
-[git-cliff](https://git-cliff.org) — don't edit it. If an entry needs more than a
-line, put the explanation in the **commit body**; the template carries it through
-verbatim. `chore`, `ci`, `style` and `test` commits are left out of the changelog
-on purpose: a reader wants to know what changed about the package.
+**`CHANGELOG.md` is generated from those subjects** — don't edit it. If an entry
+needs more than a line, put the explanation in the **commit body**, which is
+carried through verbatim. `chore` and `style` commits are left out on purpose: a
+reader wants to know what changed about the package.
+
+[release-please](https://github.com/googleapis/release-please) owns that file. It
+also owns the *version number*, which it derives from the same subjects — `feat`
+bumps the minor while the package is pre-1.0, `fix` bumps the patch, and a `!`
+or a `BREAKING CHANGE:` footer bumps the major. Nobody types a version.
+
+To preview what your commits will say before you push:
 
 ```bash
-uvx git-cliff==2.13.1 -o CHANGELOG.md   # regenerate, at release time
-uvx git-cliff==2.13.1 --unreleased      # preview what your commits will say
+uvx git-cliff==2.13.1 --unreleased
 ```
+
+That is git-cliff rather than release-please because it runs offline against your
+own checkout. It is a *preview only*: the file in the repository is written by
+release-please, and git-cliff's other job is rendering the notes for a release cut
+from a hand-pushed tag.
 
 ## What CI runs
 
@@ -197,11 +207,13 @@ library's own "bounded, always" rule.
 Maintainers only. `__version__` in `src/lovely_assertions/__init__.py` is the
 single source of truth; the wheel takes it from there.
 
-1. Bump `__version__`.
-2. Regenerate the changelog: `uvx git-cliff==2.13.1 --tag vX.Y.Z -o CHANGELOG.md`,
-   and commit it with the bump — through a pull request, like everything else.
-3. Tag `vX.Y.Z` on `main` and push the tag.
-4. **Approve the deployment.** The `pypi` environment requires a reviewer, so the
+There are no steps to remember. Every push to `main` updates a standing **release
+pull request** that carries the next version and the changelog entries for it.
+
+1. Read it. It says which version it will cut and why — that is the review.
+2. Merge it. release-please writes `__version__` and `CHANGELOG.md`, tags the
+   commit and opens the GitHub release, which triggers `release.yml`.
+3. **Approve the deployment.** The `pypi` environment requires a reviewer, so the
    publish job waits for a human before anything reaches the index. That gate is
    the last point at which a mistaken tag costs nothing: a version number on PyPI
    cannot be reused, even after it is yanked.

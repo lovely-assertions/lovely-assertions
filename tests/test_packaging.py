@@ -12,6 +12,7 @@ for as long as nobody reads it against the code.
 """
 
 import ast
+import json
 import re
 import subprocess
 import sys
@@ -159,6 +160,37 @@ def test_the_version_has_one_source() -> None:
     assert pyproject["tool"]["hatch"]["version"]["path"] == "src/lovely_assertions/__init__.py"
     assert isinstance(lovely_assertions.__version__, str)
     assert lovely_assertions.__version__.count(".") >= 2, lovely_assertions.__version__
+
+
+def test_release_please_and_the_package_agree_about_the_version() -> None:
+    """The bot's record of the version and the package's own line must not diverge.
+
+    release-please keeps the last released version in
+    ``.release-please-manifest.json`` and rewrites ``__version__`` from it. It
+    finds that line by the ``x-release-please-version`` marker and by nothing
+    else, so deleting the marker does not fail anything: releases go on being
+    tagged, the changelog goes on being written, and the module quietly keeps
+    reporting the version before last. A wheel that reports the wrong version is
+    not a cosmetic problem -- it is what a bug report will cite.
+
+    Both halves are checked here because each fails silently on its own.
+    """
+    manifest_path = REPO_ROOT / ".release-please-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["."] == lovely_assertions.__version__, (
+        f"{manifest_path.name} says {manifest['.']!r} and `__version__` says "
+        f"{lovely_assertions.__version__!r}. release-please writes both, so they "
+        f"disagree only after a hand edit."
+    )
+
+    source = (REPO_ROOT / "src" / "lovely_assertions" / "__init__.py").read_text(encoding="utf-8")
+    version_lines = [line for line in source.splitlines() if line.startswith("__version__ = ")]
+    assert len(version_lines) == 1, f"expected one `__version__` line, found {version_lines}"
+    assert "x-release-please-version" in version_lines[0], (
+        f"the `# x-release-please-version` marker is gone from {version_lines[0]!r}. "
+        f"Without it release-please tags and writes the changelog but never updates "
+        f"this line, and the package reports a stale version with nothing failing."
+    )
 
 
 def test_zero_runtime_dependencies() -> None:

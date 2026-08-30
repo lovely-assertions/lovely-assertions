@@ -1,0 +1,79 @@
+name: Release Please
+
+# The version number is derived from the commit log rather than chosen by a
+# person. Every push to `main` updates a standing release pull request that
+# carries the next version and the changelog entries for it; merging that pull
+# request tags the commit and opens the GitHub release, which is what triggers
+# `release.yml` to build, attest and publish.
+#
+# Nothing here is irreversible on its own. release-please only ever *opens a
+# pull request*; a human still reads it and merges it, and the same required
+# checks apply to it as to anything else.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A second push while the release pull request is being written would race it.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: release pull request
+    runs-on: ubuntu-latest
+    # No elevated `permissions:` block, deliberately. The work is done with a
+    # token minted from a GitHub App installation, so `GITHUB_TOKEN` stays
+    # read-only for this workflow. That is not only tidier: a pull request
+    # opened with `GITHUB_TOKEN` does not trigger other workflows, so the
+    # release pull request would arrive with no `CI success` and could not be
+    # merged without an administrator bypassing the rule. An App is a separate
+    # identity, so its pull requests are checked like everybody else's.
+    steps:
+      - name: Is the app configured?
+        id: guard
+        env:
+          APP_ID: ${{ vars.RELEASE_PLEASE_APP_ID }}
+          PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APP_ID" ] || [ -z "$PRIVATE_KEY" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Release Please not configured::\
+          RELEASE_PLEASE_APP_ID (variable) or RELEASE_PLEASE_PRIVATE_KEY (secret) \
+          is missing, so no release pull request was opened. Create a GitHub App with \
+          contents:write, pull-requests:write and issues:write, install it on this \
+          repository, and store its id and private key."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        if: steps.guard.outputs.configured == 'true'
+        with:
+          app-id: ${{ vars.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
+          # Asked for by name rather than inherited. Without these the token
+          # carries every permission the installation happens to hold, so
+          # widening the App later would silently widen this workflow too --
+          # and this is the workflow that writes to `main`.
+          #
+          # `contents` writes the version commit and the tag, `pull-requests`
+          # opens and updates the release pull request, and `issues` is what the
+          # `autorelease:` labels release-please tracks its own state with are
+          # filed under.
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        if: steps.guard.outputs.configured == 'true'
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

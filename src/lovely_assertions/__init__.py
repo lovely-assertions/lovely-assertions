@@ -37,7 +37,16 @@ Zero runtime dependencies, Python 3.13+, ``py.typed``.
 #: program that imports it to run one assertion. The build backend reads this very
 #: line to version the wheel, so the string here and the distribution's recorded
 #: version cannot disagree.
-__version__ = "0.1.0"
+#:
+#: The trailing marker is not decoration: release-please's generic updater rewrites
+#: the line carrying it, which is how the version derived from the commit log lands
+#: here rather than being typed by hand. Remove it and releases silently stop
+#: bumping this file while still tagging.
+#:
+#: It reads ``0.0.0`` because nothing has been published to PyPI yet, and this
+#: line records the last *released* version rather than the next one. The release
+#: pull request is where the next one is proposed.
+__version__ = "0.0.0"  # x-release-please-version
 
 from lovely_assertions._core import Expect, Found, SoftScope, soft_assertions
 from lovely_assertions._equivalence import Equivalency, close_within, equivalency
