@@ -23,7 +23,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from _happy_calls import SUBJECT_CLASSES
+from _happy_calls import SUBJECT_CLASSES, owning_subject
 from lovely_assertions import AssertionFailure, expect
 
 _VACUOUS: list[tuple[str, Callable[[], object]]] = [
@@ -190,7 +190,7 @@ def _variadic_owners() -> set[str]:
                 continue
             parameters = inspect.signature(member).parameters.values()
             if any(p.kind is inspect.Parameter.VAR_POSITIONAL for p in parameters):
-                owners.add(member.__qualname__.split(".")[0])
+                owners.add(owning_subject(member.__qualname__.split(".")[0]))
     return owners
 
 

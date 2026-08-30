@@ -266,7 +266,12 @@ def read_subject(module: str, class_name: str, display: str) -> Subject:
     declaration = "class " + class_name + _type_params(node)
     if node.bases:
         aliases = _aliases(tree)
-        declaration += "(" + ", ".join(_base(base, aliases) for base in node.bases) + ")"
+        bases = [_base(base, aliases) for base in node.bases]
+        # A subject built from one mixin per seam lists ten bases nobody outside
+        # the package can name. The arrangement is real and the reference is not
+        # where it is documented; a reader here wants the subject it produces.
+        if not any(name.endswith("Assertions" + _type_params(node)) for name in bases):
+            declaration += "(" + ", ".join(bases) + ")"
     subject = Subject(name=class_name, display=display, declaration=declaration)
 
     overloads: dict[str, list[str]] = {}
@@ -320,7 +325,14 @@ def build_subjects() -> dict[str, Subject]:
         for base_module, base_name, title in SHARED_BASES.get(name, ()):
             base = read_subject(base_module, base_name, base_name)
             for method in base.methods:
-                method.group = title
+                method.group = method.group or title
+                # An explicit `self:` names the class that declares the method.
+                # Inside a package split by seam that is a mixin, and naming one
+                # in the reference tells a reader about an arrangement they
+                # cannot see and must not depend on.
+                method.signatures = [
+                    signature.replace(base_name, name) for signature in method.signatures
+                ]
             shared += base.methods
         subject.methods = shared + subject.methods
         subjects[name] = subject
@@ -799,7 +811,7 @@ class Colour(Enum):
 #: ``RaisedExpect`` and ``WarnedExpect`` -- follow the callable that produces
 #: them, for the same reason.
 TARGETS: list[tuple[str, str, str]] = [
-    ("_core.py", "Expect", "Expect[T]"),
+    ("_core/__init__.py", "Expect", "Expect[T]"),
     ("_bool.py", "BoolExpect", "BoolExpect"),
     ("_string.py", "StringExpect", "StringExpect"),
     ("_ordered.py", "OrderedExpect", "OrderedExpect[T]"),
@@ -829,6 +841,23 @@ TARGETS: list[tuple[str, str, str]] = [
 #: banner. ``DateTimeExpect`` takes only the clock half: it inherits
 #: ``DateExpect``, which already carries the ordering half.
 SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "Expect": (
+        ("_core/_base.py", "ExpectBase", "Continuations"),
+        ("_core/_truthiness.py", "TruthinessAssertions", "Truthiness"),
+        (
+            "_core/_composition.py",
+            "CompositionAssertions",
+            "Composition (chaining is an AND; these are the other two)",
+        ),
+        ("_core/_equality.py", "EqualityAssertions", "Equality"),
+        ("_core/_shape.py", "EquivalenceAssertions", "Structural equivalence"),
+        ("_core/_identity.py", "IdentityAssertions", "Identity"),
+        ("_core/_nullability.py", "NullabilityAssertions", "None (and the narrowing primitive)"),
+        ("_core/_membership.py", "MembershipAssertions", "Membership"),
+        ("_core/_predicates.py", "PredicateAssertions", "Predicates"),
+        ("_core/_instance.py", "InstanceAssertions", "Type"),
+        ("_core/_coercion.py", "CoercionAssertions", "Type"),
+    ),
     "DateExpect": (("_datetime.py", "_TemporalExpect", "Ordering and ranges"),),
     "DateTimeExpect": (("_datetime.py", "_ClockExpect", "The clock"),),
     "TimeExpect": (
@@ -883,9 +912,9 @@ EXTRAS: list[tuple[str, tuple[tuple[str, str, str], ...]]] = [
             ("_exceptions.py", "class", "AssertionFailure"),
             ("_callable.py", "function", "expect_raises"),
             ("_warnings.py", "function", "expect_warns"),
-            ("_core.py", "function", "soft_assertions"),
-            ("_core.py", "class", "SoftScope"),
-            ("_core.py", "class", "Found"),
+            ("_core/_soft.py", "function", "soft_assertions"),
+            ("_core/_scope.py", "class", "SoftScope"),
+            ("_core/_found.py", "class", "Found"),
             ("_datetime.py", "class", "WithinDelta"),
         ),
     ),
@@ -1694,7 +1723,7 @@ def main(destination: Path = OUT) -> None:
     is why the destination is a parameter rather than a constant.
     """
     subjects = build_subjects()
-    found = read_subject("_core.py", "Found", "Found[P, V]")
+    found = read_subject("_core/_found.py", "Found", "Found[P, V]")
 
     problems: list[str] = []
     for name, subject in subjects.items():

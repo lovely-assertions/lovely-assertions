@@ -55,6 +55,7 @@ from lovely_assertions import (
     expect,
     soft_assertions,
 )
+from lovely_assertions._core import _routing
 from lovely_assertions._formatting import _scope, formatting
 from lovely_assertions._occurrence import (
     Occurrence,
@@ -130,12 +131,11 @@ def test_a_passing_counted_assertion_never_touches_the_failure_path(
     is real work done *before* the answer is known -- which makes these the four
     most likely places in the module for a message to be built one line too early.
     """
-    from lovely_assertions import _core
 
     def detonate(*_args: object, **_kwargs: object) -> NoReturn:
         pytest.fail("a passing counted assertion reached the failure path")
 
-    monkeypatch.setattr(_core, "resolve_subject_name", detonate)
+    monkeypatch.setattr(_routing, "resolve_subject_name", detonate)
     monkeypatch.setattr(Expect, "_fail", detonate)
 
     expect("hello").contains("l", occurrences=twice)

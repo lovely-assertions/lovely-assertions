@@ -118,7 +118,7 @@ MESSAGE_BUILDERS: Final = frozenset(
         "_fail",
         "_fail_narrowing",
         "_render_failure",
-        "_render_aggregate",
+        "render_aggregate",
         "__repr__",
         "__str__",
     }
