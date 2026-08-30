@@ -154,9 +154,11 @@ Expected Path(".") to have a child named 'missing.txt', but '.' holds ['notes.tx
 It **lists what is actually there**, which is the answer to "why isn't my file
 found" most of the time. The listing is clipped for a large directory.
 
-`does_not_have_child` is the complement, and `is_not_directory` / `is_not_file`
-assert the negative *about a path that exists* — see the gotcha below, because
-they are not what you want for a path that is absent.
+`does_not_have_child`, `is_not_directory` and `is_not_file` are **not**
+complements: each asserts the negative *about a path that exists*. A subject that
+is not a directory fails `does_not_have_child` outright rather than passing it
+vacuously. See the gotcha below — none of them is what you want for a path that
+is absent.
 
 `has_child` takes one entry name, never a route — assert on the child path itself
 for anything deeper.

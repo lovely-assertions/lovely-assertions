@@ -40,9 +40,12 @@ pattern these rules exist to warn about.
 **Why it stays:** first-match-wins ordering *is* the dispatch contract.
 `expect(True)` must be a `BoolExpect` and not a `NumericExpect`; `expect("x")`
 must be a `StringExpect` and not a `SequenceExpect[str]`. The overlap is the
-mechanism, so both checkers are told per line that it is intended. The runtime
-dispatch walks the identical order, and a typed test pins the static half against
-the runtime half. See [Typed dispatch](typed-dispatch.md).
+mechanism, so each checker that reports it is told per line that it is intended:
+the `bool` and `str` overloads carry both suppressions, while the `Mapping` one
+carries mypy's alone — pyright does not report that pair, and adding its
+suppression there would fail the build, since `reportUnnecessaryTypeIgnoreComment`
+is an error here. The runtime dispatch walks the identical order, and a typed test
+pins the static half against the runtime half. See [Typed dispatch](typed-dispatch.md).
 
 ### `reportPrivateUsage` (pyright)
 

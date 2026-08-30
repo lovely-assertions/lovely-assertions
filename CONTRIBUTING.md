@@ -156,12 +156,41 @@ single result:
 | `build` | the wheel carries `py.typed`, declares no dependencies, renders on PyPI, and contains nothing it should not |
 | `conventional commits` | every commit subject on the pull request |
 
-Weekly, in `Scheduled`: the benchmarks (printed, never asserted), the suite on
-the next Python beta (allowed to fail), and the suite against the *lowest*
-declared version of every dev tool — because a floor nobody runs is a guess.
+Weekly, in `Scheduled`: the benchmarks (printed, never asserted), the three
+fuzzing targets (see below), the suite on the next Python beta (allowed to
+fail), and the suite against the *lowest* declared version of every dev tool —
+because a floor nobody runs is a guess.
 
-Weekly, in `Security`: `zizmor` over the workflows and `pip-audit` over the
-locked development tree.
+Weekly, in `Security`: `zizmor` over the repository and `pip-audit` over the
+locked development tree. The zizmor target is `.` rather than
+`.github/workflows/` on purpose — it also reads `dependabot.yml` and the
+pre-commit configuration, so the narrower target reports a clean tree that CI
+then fails.
+
+## Fuzzing
+
+Three targets under [`fuzz/`](fuzz/README.md), driven by Atheris, each pointed
+at a promise this library makes in prose: that a failing comparison raises
+`AssertionFailure` and nothing else, that the string catalogue survives
+arbitrary text, and — the one worth having — that a value whose `__repr__`,
+`__eq__` or `__hash__` misbehaves cannot turn a failure into an error.
+
+Atheris publishes manylinux x86_64 wheels and nothing else, so the deciding
+code lives in plain functions in `fuzz/properties.py` rather than in the
+drivers. `tests/test_fuzzing.py` runs those same functions over a seeded corpus
+on every platform, on every ordinary `uv run pytest`. You do not need Atheris to
+exercise the properties; it only drives them harder.
+
+On Linux, to drive one target for real:
+
+```bash
+uv sync --group fuzz --python 3.13 && uv run python -m fuzz.fuzz_hostile -max_total_time=60
+```
+
+This is not decoration. The hostile target found a real defect on its first
+serious run: `render_items` bounded *how many* items a message listed and never
+how large one could be, so ten items could produce half a megabyte against the
+library's own "bounded, always" rule.
 
 ## Releasing
 

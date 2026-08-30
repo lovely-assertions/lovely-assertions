@@ -241,6 +241,24 @@ count that was wrong. `is_uuid` also returns a continuation, so `.which` hands
 you the parsed `UUID` object. `uuid` is imported inside the assertion rather than
 at module level, so a suite that never asserts on one never pays for it.
 
+Pass `version=` when the version is part of what you are asserting — a v4 token
+is random, a v1 one carries a timestamp and a MAC address, and accepting either
+where you meant one is a real bug:
+
+```python
+token = "5b8f0c7e-2a4d-41f9-9c3e-7d1b6a0e2f84"
+expect(token).is_uuid(version=4)
+
+try:
+    expect(token).is_uuid(version=1)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected token to be a version 1 UUID, but '5b8f0c7e-2a4d-41f9-9c3e-7d1b6a0e2f84' is version 4.
+```
+
 ## Case-insensitive equality
 
 ```python
@@ -257,6 +275,20 @@ except AssertionFailure as failure:
 
 ```text
 Expected header_name to equal 'content-length' ignoring case, but was 'Content-Type'.
+```
+
+Case is not the only difference worth forgiving, and the other two are opt-in for
+the same reason case is: silently ignoring whitespace would hide a real bug in
+code that builds a string by concatenation. `ignoring_whitespace=True` forgives
+leading, trailing and internal runs of it; `ignoring_newline_style=True` treats
+`\r\n` and `\n` as the same line ending, which is what you want when a fixture
+file was written on one platform and read on another. Both are available on
+`is_not_equal_ignoring_case` too, and the failure message names whichever ones
+were in force.
+
+```python
+expect(" Content-Type ").is_equal_ignoring_case("content-type", ignoring_whitespace=True)
+expect("first\r\nsecond").is_equal_ignoring_case("FIRST\nSECOND", ignoring_newline_style=True)
 ```
 
 ## Multi-line strings get a diff

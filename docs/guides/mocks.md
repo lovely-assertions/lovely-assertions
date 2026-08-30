@@ -149,7 +149,7 @@ Expected fetch to have been called with ('/nope') at some point, but none of its
 | `was_called_once_with(...)` | called exactly once, with these |
 | `was_ever_called_with(...)` | **some** call used these |
 | `was_never_called_with(...)` | no call did |
-| `has_call_count(n)` | called exactly `n` times |
+| `has_call_count(n)` | called exactly `n` times — or takes an [occurrence](occurrences.md), so `has_call_count(at_least(2))` reads as it sounds |
 | `.calls` | a sequence subject over every recorded call |
 | `.last_call()` | asserts there was one, and continues on it with `.which` |
 
@@ -244,6 +244,11 @@ True False
 
 It asks the **class**, not the instance — so a hand-rolled spy that builds its
 markers in `__init__` is not recognised.
+
+One narrow exception, and it exists because the standard library needs it:
+`create_autospec(some_function)` does not return a mock at all. It returns a real
+function with the mock protocol hung off it as *instance* attributes, so that
+call is checked on the instance too. Nothing else is.
 
 ## Gotchas
 

@@ -20,7 +20,8 @@ as well as its own.
 ## Comparison
 
 Temporal comparisons read as time, not as numbers: `is_before`, `is_after`,
-`is_on_or_before`, `is_on_or_after`, plus `is_between` and `is_strictly_between`.
+`is_on_or_before`, `is_on_or_after`, plus `is_between`, `is_strictly_between` and
+`is_not_between`.
 
 ```python
 from datetime import datetime
@@ -146,7 +147,9 @@ Expected recorded_at to be within 0:05:00 before 2024-03-16T14:00:00, but was 20
 ```
 
 `is_within(...)` on its own asserts **nothing** — it is only half a sentence, and
-the assertion is the `.before(...)` or `.after(...)` that finishes it.
+the assertion is the `.before(...)` or `.after(...)` that finishes it. You are not
+left to discover that from a test that passes for the wrong reason: an unfinished
+chain emits a `RuntimeWarning` saying so, naming the delta it was holding.
 
 ## Time zones
 
@@ -229,7 +232,8 @@ a negative duration is shorter than a positive one. Also available:
 
 `TimeExpect` has the calendar-free half: `has_hour`, `has_minute`, `has_second`,
 `has_microsecond`, the comparisons (`is_before`, `is_after`, `is_on_or_before`,
-`is_on_or_after`, `is_between`, `is_strictly_between`), `is_naive`, `is_aware`,
+`is_on_or_after`, `is_between`, `is_strictly_between`, `is_not_between`),
+`is_naive`, `is_aware`,
 and one of its own:
 
 ```python

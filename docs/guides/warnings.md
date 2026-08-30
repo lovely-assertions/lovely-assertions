@@ -179,14 +179,23 @@ to error, it can raise there.
 
 ### `stacklevel` decides the reported location
 
-The file and line in a message are where `stacklevel` pointed. In the callable
-form, a `stacklevel` of 1 can point at the library rather than at your code —
-that is your warning's setting, not this library's choice.
+The file and line in a message are where `stacklevel` pointed, and the code that
+issued the warning chooses it — not this library.
+
+The case worth knowing: `warnings.warn(..., stacklevel=2)` names the *caller* of
+the function that warned. In the callable form that caller is this library's own
+invocation of your thunk, so the failure reports `_callable.py` instead of your
+test's line. It looks like a bug and is not one, and it cannot be fixed from
+here. `expect_warns` has no such frame in between and reports your block, so
+reach for the context-manager form when the location matters.
 
 ### Exception messages ignore `formatting(max_chars=...)`; warning messages honour it
 
-A deliberate asymmetry: an exception's message is the primary evidence and is
-shown whole.
+A deliberate asymmetry. An exception's message is the primary evidence, so it is
+not subject to your display settings: it carries its own fixed ceiling and is
+elided — with a note saying how many characters were dropped — only when it is
+very long. A warning's message is ordinary rendered output and honours
+`formatting(max_chars=...)` like any other value.
 
 ---
 
