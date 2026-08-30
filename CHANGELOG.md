@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [git-cliff](https://git-cliff.org). Don't edit it -- write the commit message,
 which a CI gate already requires to be a Conventional Commit.
 
+## 0.1.0 (2026-08-30)
+
+
+### Features
+
+* fluent, strictly-typed assertions for Python tests ([c7b0448](https://github.com/lovely-assertions/lovely-assertions/commit/c7b04485d3b33c2553347d9be53b44a54ad6b378))
+
+
+### Documentation
+
+* correct what the pages got wrong, and run the README ([#2](https://github.com/lovely-assertions/lovely-assertions/issues/2)) ([42d3fc5](https://github.com/lovely-assertions/lovely-assertions/commit/42d3fc5a627cd89053adc0e2344a958feb9b96b2))
+
+
+### CI
+
+* **codeql:** analyse with security-extended, not security-and-quality ([#1](https://github.com/lovely-assertions/lovely-assertions/issues/1)) ([b3d5d6a](https://github.com/lovely-assertions/lovely-assertions/commit/b3d5d6a245be54e58d33896d089a9b35e2ab5b14))
+* **release:** derive the version from the commit log with release-please ([#4](https://github.com/lovely-assertions/lovely-assertions/issues/4)) ([3c18126](https://github.com/lovely-assertions/lovely-assertions/commit/3c18126c0c6bc89a426421c11ba717aec9d49f5a))
+* **release:** tag as `v0.1.0`, and pin what nothing else connects ([#6](https://github.com/lovely-assertions/lovely-assertions/issues/6)) ([729149c](https://github.com/lovely-assertions/lovely-assertions/commit/729149c1f5426169ea3b8fee7db0a67bb23fe004))
+* **sonar:** harden the release gate, and scope what Sonar grades ([#3](https://github.com/lovely-assertions/lovely-assertions/issues/3)) ([30a64c4](https://github.com/lovely-assertions/lovely-assertions/commit/30a64c490d4386cb057f3af5310d4c83ec973a42))
+
 ## [0.1.0] - 2026-08-29
 
 ### Added
@@ -61,4 +81,3 @@ which a CI gate already requires to be a Conventional Commit.
   Every Python block in the documentation is executed by the test suite and
   every failure message it quotes is compared against what the library actually
   prints, so a page cannot drift from the code without failing the build.
-
