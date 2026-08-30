@@ -33,12 +33,15 @@ cannot see it at all. ``typing_tests/positive/matching.py`` and
 import copy
 import math
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, Final, cast
 from unittest.mock import Mock
 
 import pytest
 from benchmarks import peak_bytes_allocated
 
+import lovely_assertions
+from _package import module_name, sources
 from conftest import measured
 from lovely_assertions import (
     AssertionFailure,
@@ -51,6 +54,8 @@ from lovely_assertions import (
 )
 from lovely_assertions._formatters import _registry
 from lovely_assertions._matching import (
+    _base,
+    _wiring,
     any_instance_of,
     anything,
     close_to,
@@ -117,7 +122,7 @@ def matcher_base() -> Any:
     :func:`_global_registry` reads ``_GLOBAL`` below: a direct access to a
     protected name across a module boundary is what pyright reports.
     """
-    return vars(_matching)["_Matcher"]
+    return vars(_base)["Matcher"]
 
 
 def message_of(failure: pytest.ExceptionInfo[AssertionFailure], /) -> str:
@@ -914,7 +919,7 @@ def test_the_refusal_is_a_type_error_and_not_an_assertion_failure() -> None:
 
 def test_every_matcher_type_is_refused() -> None:
     """The registration is a list; a matcher added without one would slip through."""
-    registered = vars(_matching)["_MATCHER_TYPES"]
+    registered = vars(_wiring)["MATCHER_TYPES"]
     assert len(registered) == len({type(matcher) for matcher in MATCHERS})
 
 
@@ -979,9 +984,28 @@ def test_an_assertion_with_no_matcher_in_it_pays_for_none_of_this() -> None:
 # The docstrings
 # ---------------------------------------------------------------------------
 def test_the_examples_in_the_docstrings_hold() -> None:
-    """The docstrings promise specific output; a promise nobody checks is a comment."""
-    import doctest
+    """The docstrings promise specific output; a promise nobody checks is a comment.
 
-    results = doctest.testmod(_matching, extraglobs={"expect": expect})
-    assert results.failed == 0
-    assert results.attempted > 0
+    Run over every module of the package rather than the package object:
+    ``doctest.testmod`` looks at the namespace it is handed, so a package would
+    answer for its ``__init__`` alone and report a clean pass for examples it
+    never opened. The ``attempted`` count below is what says so out loud.
+
+    Each example runs against the package's public API, which is the namespace
+    its reader has. Inside one module a sibling's name is no longer in scope, and
+    an example that only worked because everything shared one file was an example
+    nobody could paste.
+    """
+    import doctest
+    from importlib import import_module
+
+    package = Path(_matching.__file__).parent
+    root = Path(lovely_assertions.__file__).parent
+    public = {name: getattr(lovely_assertions, name) for name in lovely_assertions.__all__}
+    attempted = 0
+    for path in sources(package):
+        module = import_module(module_name(path, root))
+        results = doctest.testmod(module, extraglobs=public)
+        assert results.failed == 0, module.__name__
+        attempted += results.attempted
+    assert attempted > 0

@@ -913,15 +913,15 @@ EXTRAS: list[tuple[str, tuple[tuple[str, str, str], ...]]] = [
     (
         "Matchers",
         (
-            ("_matching.py", "function", "any_instance_of"),
-            ("_matching.py", "function", "anything"),
-            ("_matching.py", "function", "string_matching"),
-            ("_matching.py", "function", "string_containing"),
-            ("_matching.py", "function", "close_to"),
-            ("_matching.py", "function", "one_of"),
-            ("_matching.py", "function", "containing"),
-            ("_matching.py", "function", "matching"),
-            ("_matching.py", "function", "is_matcher"),
+            ("_matching/_instances.py", "function", "any_instance_of"),
+            ("_matching/_instances.py", "function", "anything"),
+            ("_matching/_strings.py", "function", "string_matching"),
+            ("_matching/_strings.py", "function", "string_containing"),
+            ("_matching/_numbers.py", "function", "close_to"),
+            ("_matching/_choice.py", "function", "one_of"),
+            ("_matching/_containers.py", "function", "containing"),
+            ("_matching/_predicate.py", "function", "matching"),
+            ("_matching/_base.py", "function", "is_matcher"),
         ),
     ),
     (
@@ -941,7 +941,7 @@ EXTRAS: list[tuple[str, tuple[tuple[str, str, str], ...]]] = [
         "Dispatch and extension",
         (
             ("_subjects.py", "function", "register"),
-            ("_names.py", "function", "custom_assertion"),
+            ("_names/_frames.py", "function", "custom_assertion"),
             ("_mock.py", "function", "is_mock"),
         ),
     ),

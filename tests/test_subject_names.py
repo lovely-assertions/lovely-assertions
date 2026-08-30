@@ -21,6 +21,7 @@ from lovely_assertions import (
     expect_raises,
     soft_assertions,
 )
+from lovely_assertions._names import _frames, _resolution
 
 
 def test_simple_variable() -> None:
@@ -277,7 +278,7 @@ def test_the_index_is_keyed_on_the_lines_linecache_handed_back(tmp_path: Path) -
     """
     import linecache
 
-    from lovely_assertions._names import (
+    from lovely_assertions._names._index import (
         _FILE_INDEXES,  # pyright: ignore[reportPrivateUsage]
     )
 
@@ -333,7 +334,7 @@ def test_two_threads_failing_in_the_same_file_both_get_their_own_name(
     """
     import threading
 
-    from lovely_assertions._names import (
+    from lovely_assertions._names._index import (
         _FILE_INDEXES,  # pyright: ignore[reportPrivateUsage]
     )
 
@@ -379,16 +380,16 @@ def test_the_index_cache_is_bounded(tmp_path: Path) -> None:
     tight and, like ``_subjects._SHAPE_ANSWERS``, it clears wholesale rather than
     evicting: the cost of overshooting is a re-parse, not a wrong answer.
     """
-    from lovely_assertions._names import (
+    from lovely_assertions._names._index import (
         _FILE_INDEXES,  # pyright: ignore[reportPrivateUsage]
         _MAX_FILE_INDEXES,  # pyright: ignore[reportPrivateUsage]
-        _index_for,  # pyright: ignore[reportPrivateUsage]
+        index_for,
     )
 
     _FILE_INDEXES.clear()
     try:
         for i in range(_MAX_FILE_INDEXES * 2 + 3):
-            assert _index_for(f"<synthetic {i}>", ["value = 1\n"]) is not None
+            assert index_for(f"<synthetic {i}>", ["value = 1\n"]) is not None
             assert len(_FILE_INDEXES) <= _MAX_FILE_INDEXES
     finally:
         _FILE_INDEXES.clear()
@@ -439,7 +440,7 @@ def test_a_statement_the_parser_could_not_place_costs_only_itself(
 
 
 def test_a_recovered_segment_matches_the_stdlib_it_replaces(tmp_path: Path) -> None:
-    """``_source_segment`` is ``ast.get_source_segment`` without the re-split.
+    """``source_segment`` is ``ast.get_source_segment`` without the re-split.
 
     Held against the original over a file chosen to break a naive slice: CRLF
     endings, characters outside ASCII (``col_offset`` counts bytes), expressions
@@ -449,9 +450,7 @@ def test_a_recovered_segment_matches_the_stdlib_it_replaces(tmp_path: Path) -> N
     import ast
     import linecache
 
-    from lovely_assertions._names import (
-        _source_segment,  # pyright: ignore[reportPrivateUsage]
-    )
+    from lovely_assertions._names._index import source_segment
 
     path = tmp_path / "awkward.py"
     path.write_bytes(
@@ -477,7 +476,7 @@ def test_a_recovered_segment_matches_the_stdlib_it_replaces(tmp_path: Path) -> N
         if not isinstance(node, ast.expr):
             continue
         compared += 1
-        assert _source_segment(lines, node) == ast.get_source_segment(joined, node)
+        assert source_segment(lines, node) == ast.get_source_segment(joined, node)
     assert compared >= 20
 
 
@@ -660,7 +659,7 @@ def test_a_failure_to_recover_a_name_never_costs_the_assertion_its_message(
     captured, and a subject built inside ``exec`` has a filename naming nothing
     at all. The guard is therefore over everything, not over one exception type.
     """
-    monkeypatch.setattr(_names, "_caller_frame", _explode)
+    monkeypatch.setattr(_resolution, "caller_frame", _explode)
     balance = 4
     with pytest.raises(AssertionFailure) as caught:
         expect(balance).is_equal_to(3)
@@ -679,7 +678,7 @@ def test_a_failure_to_recover_a_name_does_not_discard_a_soft_scope(
     with pytest.raises(AssertionFailure) as caught, soft_assertions():
         expect(1).is_equal_to(2)
         expect("a").is_equal_to("b")
-        monkeypatch.setattr(_names, "_caller_frame", _explode)
+        monkeypatch.setattr(_resolution, "caller_frame", _explode)
         expect(3).is_equal_to(4)
 
     report = str(caught.value)
@@ -723,7 +722,7 @@ def test_a_stack_with_nobody_left_to_name_falls_back(monkeypatch: pytest.MonkeyP
         marked.add(frame.f_code)
         frame = frame.f_back
 
-    monkeypatch.setattr(_names, "_CUSTOM_ASSERTION_CODES", marked)
+    monkeypatch.setattr(_frames, "_CUSTOM_ASSERTION_CODES", marked)
 
     balance = 4
     with pytest.raises(AssertionFailure) as caught:
@@ -776,11 +775,9 @@ def test_source_that_does_not_parse_yields_no_index() -> None:
     Asking the index directly is the only thing that tells declining apart from
     unwinding.
     """
-    from lovely_assertions._names import (
-        _index_for,  # pyright: ignore[reportPrivateUsage]
-    )
+    from lovely_assertions._names._index import index_for
 
-    index = _index_for("<not python>", ["this is not ( python\n"])
+    index = index_for("<not python>", ["this is not ( python\n"])
 
     assert index is None
 
