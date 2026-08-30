@@ -10,6 +10,8 @@ import re
 from pathlib import Path
 from typing import Final
 
+from _package import sources
+
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 SRC_DIR: Final = REPO_ROOT / "src"
 DIVERGENCES_DOC: Final = REPO_ROOT / "docs" / "concepts" / "typing-divergences.md"
@@ -34,7 +36,7 @@ class Suppression:
 
 
 def _source_files() -> list[Path]:
-    return sorted(SRC_DIR.rglob("*.py"))
+    return sources(SRC_DIR)
 
 
 def _suppressions() -> list[Suppression]:
