@@ -109,11 +109,32 @@ jobs:
       # tree, in a project-free environment. A packaging mistake -- a module
       # left out of the wheel, a data file the build backend dropped -- is
       # invisible to a run that imports from `src/`.
+      # The test runner comes from `uv.lock`, not from a resolution done here.
+      # This is the gate that decides whether a release ships, so the tool it
+      # runs on must not be able to change between the pull request that was
+      # reviewed and the tag that is cut -- and `--with pytest` resolved the
+      # newest release every time it ran.
+      #
+      # `--no-install-project` is what keeps the wheel under test: it installs
+      # the locked development tools and nothing else, so `lovely_assertions` is
+      # absent from the environment until the wheel puts it there. Installing
+      # the project as well would shadow the wheel with `src/` and quietly test
+      # the wrong thing.
+      #
+      # `--no-build` and `--only-binary :all:` say the rest out loud: nothing in
+      # this environment may be installed by building a source distribution,
+      # which would run that distribution's build code on a runner holding the
+      # release credentials. It holds because every locked dependency publishes
+      # a wheel -- an invariant tests/test_packaging.py reads out of the lock, so
+      # a dependency that stops publishing one fails review rather than this job.
+      # (An ordinary `uv sync` could not ask for this: it installs the project
+      # itself as an editable, which has no wheel by definition.)
       - name: the built wheel passes its own suite
         run: |
           set -euo pipefail
-          uv run --no-project --with ./dist/*.whl --with pytest \
-            pytest tests -q -p no:cacheprovider \
+          uv sync --locked --no-install-project --no-build --group dev
+          uv pip install --only-binary :all: ./dist/*.whl
+          uv run --no-sync --no-build pytest tests -q -p no:cacheprovider \
             --ignore=tests/test_typing_surface.py \
             --ignore=tests/test_packaging.py \
             --ignore=tests/test_source_conventions.py \
