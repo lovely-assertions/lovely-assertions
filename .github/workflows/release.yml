@@ -260,22 +260,41 @@ jobs:
           uvx git-cliff==2.13.1 --current --strip header -o release-notes.md
           cat release-notes.md
       # `gh` is on the runner, so this is a script step rather than a pinned
-      # third-party action: nothing extra to audit or trust for six lines.
-      - name: open the release
+      # third-party action: nothing extra to audit or trust.
+      #
+      # Two routes reach this step, and the difference is whether a release
+      # already exists for the tag. release-please tags *and* opens the release
+      # when its pull request merges, so by the time this runs the page is
+      # already there with notes derived from the same commits -- there is
+      # nothing to create, only the distributions and the provenance bundle to
+      # attach. A tag pushed by hand has no release, so this opens one, with
+      # notes rendered from the commits in the tag.
+      #
+      # Upload rather than create is not an optimisation: `gh release create`
+      # on an existing tag fails, which would have turned every release-please
+      # release red at the last step, after the upload to PyPI had already
+      # happened and could not be taken back.
+      - name: attach the distributions to the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
           VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
-          prerelease=""
-          case "$VERSION" in
-            *a*|*b*|*rc*|*dev*) prerelease="--prerelease" ;;
-          esac
-          # shellcheck disable=SC2086
-          gh release create "$TAG" \
-            --verify-tag \
-            --title "$TAG" \
-            --notes-file release-notes.md \
-            $prerelease \
-            dist/*
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists (release-please opened it); attaching files"
+            gh release upload "$TAG" dist/* --clobber
+          else
+            echo "no release for $TAG yet; opening one"
+            prerelease=""
+            case "$VERSION" in
+              *a*|*b*|*rc*|*dev*) prerelease="--prerelease" ;;
+            esac
+            # shellcheck disable=SC2086
+            gh release create "$TAG" \
+              --verify-tag \
+              --title "$TAG" \
+              --notes-file release-notes.md \
+              $prerelease \
+              dist/*
+          fi

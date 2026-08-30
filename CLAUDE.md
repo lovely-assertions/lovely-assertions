@@ -110,8 +110,9 @@ Everything runs through `uv`, with the interpreter pinned explicitly.
 ## Repo etiquette
 
 - **Conventional Commits** (`type(scope): summary`), scope naming an area of the
-  code. The summary *is* the changelog entry — `CHANGELOG.md` is generated from
-  the commit log by git-cliff (`cliff.toml`) and is never hand-edited — so write
+  code. The summary *is* the changelog entry, and it is also what decides the
+  next **version number**: release-please derives both from the commit log, so
+  `CHANGELOG.md` and `__version__` are written by a bot and never by hand — write
   it for a reader who will never see the diff. An entry that needs a paragraph
   gets one: the commit body is carried through verbatim. A CI gate on every pull
   request checks the form.
@@ -119,6 +120,10 @@ Everything runs through `uv`, with the interpreter pinned explicitly.
   that leaves the tree red is not a smaller commit, it is a broken one.
 - `__version__` in `src/lovely_assertions/__init__.py` is the single source of
   truth for the version; the wheel takes it from there and a test pins the pair.
+  It is rewritten by release-please, which finds the line by the
+  `# x-release-please-version` marker on it and records the same number in
+  `.release-please-manifest.json`. Drop the marker or edit the number by hand and
+  the two silently disagree, so a test pins that pair too.
 
 ## Gotchas
 
