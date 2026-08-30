@@ -44,12 +44,12 @@ from lovely_assertions import (
     AssertionFailure,
     MockExpect,
     ObjectFormatter,
-    _formatters,
     _matching,
     expect,
     format_value,
     soft_assertions,
 )
+from lovely_assertions._formatters import _registry
 from lovely_assertions._matching import (
     any_instance_of,
     anything,
@@ -374,7 +374,7 @@ def test_a_value_inside_a_matcher_goes_through_the_formatter_registry(
 ) -> None:
     """A domain type reads as itself inside a matcher exactly as it does outside."""
     registry = [*_global_registry(), ObjectFormatter(_Ticket, "code")]
-    monkeypatch.setattr(_formatters, "_GLOBAL", registry)
+    monkeypatch.setattr(_registry, "GLOBAL", registry)
     assert format_value(raw(one_of(_Ticket("AB-1")))) == "<one of _Ticket(code='AB-1')>"
 
 
@@ -391,7 +391,7 @@ class _Greedy:
 
 
 def _global_registry() -> list[object]:
-    return list(vars(_formatters)["_GLOBAL"])
+    return list(vars(_registry)["GLOBAL"])
 
 
 def test_a_later_formatter_cannot_take_a_matcher_over(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -404,10 +404,10 @@ def test_a_later_formatter_cannot_take_a_matcher_over(monkeypatch: pytest.Monkey
     greedy formatter taking the matcher over once ours is out of the way.
     """
     greedy = _Greedy()
-    monkeypatch.setattr(_formatters, "_GLOBAL", [*_global_registry(), greedy])
+    monkeypatch.setattr(_registry, "GLOBAL", [*_global_registry(), greedy])
     assert format_value(raw(any_instance_of(int))) == "<any int>"
 
-    monkeypatch.setattr(_formatters, "_GLOBAL", [greedy])
+    monkeypatch.setattr(_registry, "GLOBAL", [greedy])
     assert format_value(raw(any_instance_of(int))) == "claimed"
 
 

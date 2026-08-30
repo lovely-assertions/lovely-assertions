@@ -33,7 +33,7 @@ from lovely_assertions import (
     expect,
     soft_assertions,
 )
-from lovely_assertions._formatting import formatting
+from lovely_assertions._formatting import _scope, formatting
 from lovely_assertions._reflection import dataclass_field_names
 from lovely_assertions._type import TypeExpect
 
@@ -210,13 +210,12 @@ def test_no_passing_assertion_touches_the_failure_path() -> None:
 
 def test_the_trap_actually_detonates(monkeypatch: pytest.MonkeyPatch) -> None:
     """A rule nobody can fail is not a rule."""
-    from lovely_assertions import _formatting
 
     class Detonator:
         def __getattr__(self, name: str) -> NoReturn:
             raise AssertionError(name)
 
-    monkeypatch.setattr(_formatting, "_ACTIVE", Detonator())
+    monkeypatch.setattr(_scope, "_ACTIVE", Detonator())
     with pytest.raises(AssertionError, match="get"):
         TypeExpect(Repo).is_not_abstract()
 

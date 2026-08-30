@@ -50,13 +50,12 @@ from lovely_assertions import (
     AssertionFailure,
     Expect,
     StringExpect,
-    _formatting,
     _string,
     _text,
     expect,
     soft_assertions,
 )
-from lovely_assertions._formatting import formatting
+from lovely_assertions._formatting import _scope, formatting
 from lovely_assertions._occurrence import (
     Occurrence,
     at_least,
@@ -1946,7 +1945,7 @@ def test_a_scope_changes_what_is_said_and_never_what_is_decided() -> None:
 @pytest.fixture
 def no_options_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
     """Booby-trap the options lookup, the way this file already traps ``_fail``."""
-    monkeypatch.setattr(_formatting, "_ACTIVE", Detonator())
+    monkeypatch.setattr(_scope, "_ACTIVE", Detonator())
 
 
 @pytest.mark.usefixtures("no_options_lookup")

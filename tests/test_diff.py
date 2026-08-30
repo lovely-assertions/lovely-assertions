@@ -32,9 +32,9 @@ import pytest
 import lovely_assertions
 from _package import module_name, sources
 from conftest import Detonator
-from lovely_assertions import AssertionFailure, _diff, _formatting, expect
+from lovely_assertions import AssertionFailure, _diff, expect
 from lovely_assertions._diff import describe_difference
-from lovely_assertions._formatting import current_formatting, formatting
+from lovely_assertions._formatting import _scope, current_formatting, formatting
 
 #: Long enough to blow the budget for reading two reprs side by side on one line.
 LEFT: Final = "the quick brown fox jumps over the lazy dog"
@@ -976,7 +976,7 @@ def test_a_scope_changes_what_is_printed_and_never_what_is_decided() -> None:
 @pytest.fixture
 def no_options_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
     """Booby-trap the options lookup, the way ``tests/test_happy_path.py`` traps ``_fail``."""
-    monkeypatch.setattr(_formatting, "_ACTIVE", Detonator())
+    monkeypatch.setattr(_scope, "_ACTIVE", Detonator())
 
 
 @pytest.mark.usefixtures("no_options_lookup")
