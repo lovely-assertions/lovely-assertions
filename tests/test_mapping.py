@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Final, cast
 import pytest
 from benchmarks import blocks_allocated
 
+from _happy_calls import declared_by_the_subject
 from lovely_assertions import (
     AssertionFailure,
     CollectionExpect,
@@ -1134,7 +1135,7 @@ def test_the_because_table_has_not_fallen_behind_the_catalogue() -> None:
     covered = {parameters.id for parameters in BECAUSE_CALLS}
     declared = {
         name
-        for name, attribute in vars(MappingExpect).items()
+        for name, attribute in declared_by_the_subject(MappingExpect).items()
         if not name.startswith("_") and callable(attribute)
     }
     assert covered == declared

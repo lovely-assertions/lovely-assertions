@@ -852,8 +852,8 @@ TARGETS: list[tuple[str, str, str]] = [
     ("_ordered.py", "OrderedExpect", "OrderedExpect[T]"),
     ("_numeric.py", "NumericExpect", "NumericExpect"),
     ("_collection/__init__.py", "CollectionExpect", "CollectionExpect[E, C]"),
-    ("_sequence.py", "SequenceExpect", "SequenceExpect[E]"),
-    ("_mapping.py", "MappingExpect", "MappingExpect[K, V]"),
+    ("_sequence/__init__.py", "SequenceExpect", "SequenceExpect[E]"),
+    ("_mapping/__init__.py", "MappingExpect", "MappingExpect[K, V]"),
     ("_datetime.py", "DateExpect", "DateExpect[T]"),
     ("_datetime.py", "DateTimeExpect", "DateTimeExpect"),
     ("_datetime.py", "TimeExpect", "TimeExpect"),
@@ -876,6 +876,22 @@ TARGETS: list[tuple[str, str, str]] = [
 #: banner. ``DateTimeExpect`` takes only the clock half: it inherits
 #: ``DateExpect``, which already carries the ordering half.
 SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "SequenceExpect": (
+        ("_sequence/_base.py", "SequenceBase", "Message positions"),
+        ("_sequence/_equality.py", "EqualityAssertions", "Ordered equality"),
+        ("_sequence/_access.py", "AccessAssertions", "Element access"),
+        ("_sequence/_containment.py", "ContainmentAssertions", "Containment"),
+        ("_sequence/_ordering.py", "OrderingAssertions", "Ordering"),
+        ("_sequence/_projection.py", "ProjectionAssertions", "Projection"),
+        ("_sequence/_nested.py", "NestedAssertions", "Nested assertions"),
+    ),
+    "MappingExpect": (
+        ("_mapping/_size.py", "SizeAssertions", "Size"),
+        ("_mapping/_views.py", "ViewAssertions", "Views"),
+        ("_mapping/_keys.py", "KeyAssertions", "Keys"),
+        ("_mapping/_values.py", "ValueAssertions", "Values"),
+        ("_mapping/_entries.py", "EntryAssertions", "Entries"),
+    ),
     "CollectionExpect": (
         ("_collection/_base.py", "CollectionBase", "Message positions"),
         ("_collection/_emptiness.py", "EmptinessAssertions", "Emptiness"),
