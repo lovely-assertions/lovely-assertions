@@ -43,7 +43,7 @@ obviously be a frozen dataclass, but importing this package must not drag in
 and ``__repr__`` are written out by hand. And f-strings are confined to arguments
 of ``_fail``, the one call reached only once a failure is certain; nothing here
 calls it, so every message here is concatenated instead (``_formatters.py`` and
-``_diff.py`` do the same).
+``_diff`` do the same).
 """
 
 from contextvars import ContextVar
@@ -79,7 +79,7 @@ _DEFAULT_MAX_CHARS: Final = 120
 _DEFAULT_MAX_DIFF_LINES: Final = 20
 
 #: Levels of nested structure a *difference* descends into -- the value under a
-#: key, and the value under a key of that. It is the bound in ``_diff.py``, not
+#: key, and the value under a key of that. It is the bound in ``_diff``, not
 #: the separate re-entry guard in ``_formatters.py``: that one bounds recursion
 #: through user code and is a safety limit rather than a legibility one.
 _DEFAULT_MAX_DEPTH: Final = 2
@@ -165,7 +165,7 @@ class FormattingOptions:
     #: Lines of a unified diff.
     max_diff_lines: int
     #: Levels of nested structure a *difference* descends into -- the bound in
-    #: ``_diff.py``, and not the re-entry guard in ``_formatters.py``, which
+    #: ``_diff``, and not the re-entry guard in ``_formatters.py``, which
     #: bounds recursion through user code and must keep a floor of its own.
     #: ``0`` is legal here and means "do not descend"; the other three bound how
     #: much of something is shown, so they must be at least ``1``.

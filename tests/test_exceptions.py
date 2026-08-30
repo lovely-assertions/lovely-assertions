@@ -406,7 +406,7 @@ def test_an_over_long_exception_is_clipped_inside_its_repr() -> None:
 def test_a_hostile_repr_costs_detail_not_the_finding() -> None:
     """An assertion that has already failed must not turn into a library error.
 
-    ``_diff.py`` states the rule for the diff engine; it holds here too, and it
+    ``_diff`` states the rule for the diff engine; it holds here too, and it
     holds harder: rendering the exception is the last thing between the reader
     and the ``__cause__`` that explains their test.
     """

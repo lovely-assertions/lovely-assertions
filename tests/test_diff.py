@@ -11,7 +11,7 @@ caller relies on:
 block already prints both ``repr``\\ s.
 
 *It stays bounded* -- ten items, twenty diff lines, and a count of whatever was
-left out. Those numbers are not constants in ``_diff.py``: they are the defaults
+left out. Those numbers are not constants in ``_diff``: they are the defaults
 on ``FormattingOptions``, read from the formatting scope at the point of use.
 Both halves get their own section below -- the defaults are what a caller who
 sets no scope gets, and a ``formatting(...)`` block really does move them.
@@ -21,14 +21,17 @@ place of their assertion failure.
 """
 
 import time
+from importlib import import_module
+from pathlib import Path
 from typing import Any, Final
 
 import pytest
 
-from conftest import Detonator
-
 # `formatting` comes from its private module because the package root does not
 # re-export it.
+import lovely_assertions
+from _package import module_name, sources
+from conftest import Detonator
 from lovely_assertions import AssertionFailure, _diff, _formatting, expect
 from lovely_assertions._diff import describe_difference
 from lovely_assertions._formatting import current_formatting, formatting
@@ -809,17 +812,26 @@ def test_two_self_referential_lists_degrade_instead_of_recursing_forever() -> No
 # ---------------------------------------------------------------------------
 # The bounds are a scope, not four constants
 # ---------------------------------------------------------------------------
-def test_the_module_no_longer_carries_a_bound_of_its_own() -> None:
-    """One source of truth, pinned by its absence.
+def test_no_module_of_the_package_carries_a_bound_of_its_own() -> None:
+    """One source of truth, pinned by its absence -- in every module, not just one.
 
     A constant here would keep working, keep agreeing with the default, and
     quietly ignore every scope -- which is the failure mode that is hardest to
     notice and easiest to prevent.
+
+    Asked of each module rather than of the package, because ``hasattr`` on a
+    package reads only what its ``__init__`` binds: the engine's constants live
+    in the modules that spend them, so a bound reintroduced beside them would sit
+    exactly where a package-level question cannot see it.
     """
-    for name in ("_MAX_ITEMS", "_MAX_CHARS", "_MAX_DIFF_LINES", "_MAX_DEPTH"):
-        assert not hasattr(_diff, name), (
-            name + " is back in _diff.py; the bounds live on FormattingOptions"
-        )
+    root = Path(lovely_assertions.__file__).parent
+    package = Path(_diff.__file__).parent
+    for path in sources(package):
+        module = import_module(module_name(path, root))
+        for name in ("_MAX_ITEMS", "_MAX_CHARS", "_MAX_DIFF_LINES", "_MAX_DEPTH"):
+            assert not hasattr(module, name), (
+                f"{name} is back in {module.__name__}; the bounds live on FormattingOptions"
+            )
 
 
 def test_the_defaults_are_the_numbers_the_constants_used_to_be() -> None:

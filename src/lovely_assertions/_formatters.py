@@ -29,7 +29,7 @@ library takes the same line.
 where it is written, so the library confines them to arguments of ``_fail`` --
 the one call reached only once a failure is certain -- and a module with no
 ``_fail`` in it therefore has no f-strings at all. This is one of those modules;
-``_diff.py`` is another.
+``_diff`` is another.
 """
 
 from collections.abc import Iterable, Sized

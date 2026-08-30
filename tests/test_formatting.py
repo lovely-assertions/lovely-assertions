@@ -63,7 +63,7 @@ def test_the_defaults_are_the_limits_the_library_already_had() -> None:
     """Making a limit adjustable must not quietly change it.
 
     Ten items, a hundred and twenty characters, twenty diff lines, two levels of
-    nesting -- the numbers ``_diff.py`` and friends render with. Every pinned
+    nesting -- the numbers ``_diff`` and friends render with. Every pinned
     failure message in the suite depends on them.
     """
     options = FormattingOptions()
