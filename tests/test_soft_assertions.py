@@ -31,9 +31,9 @@ def _active_collector() -> object | None:
     reaches the same private: a direct attribute access across modules is what
     pyright reports, and the point here is the value, not the spelling.
     """
-    from lovely_assertions import _core
+    from lovely_assertions._core import _routing
 
-    variable: ContextVar[object | None] = vars(_core)["_ACTIVE_COLLECTOR"]
+    variable: ContextVar[object | None] = vars(_routing)["ACTIVE_COLLECTOR"]
     return variable.get()
 
 

@@ -7,7 +7,7 @@ a sink nobody reads and passes without asserting anything. The suite would look
 greener than before.
 
 So the invariant is checked where it can name the culprit -- after each test,
-before the next one starts, so the report lands on the test that leaked rather
+before the next one starts, so the report_failure lands on the test that leaked rather
 than on the first one that was silenced by it.
 
 The ``ContextVar`` object is captured **once, at import**, out of the module
@@ -25,16 +25,16 @@ import pytest
 from benchmarks import watching_the_interpreter
 
 import _happy_calls
-from _happy_calls import library_modules
-from lovely_assertions import _core
-from lovely_assertions._core import Expect
+from _happy_calls import library_modules, owning_subject
+from lovely_assertions._core import Expect, _routing
+from lovely_assertions._core._base import ExpectBase
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from contextvars import ContextVar
     from types import FrameType
 
-_ACTIVE_COLLECTOR: "ContextVar[object | None]" = vars(_core)["_ACTIVE_COLLECTOR"]
+_ACTIVE_COLLECTOR: "ContextVar[object | None]" = vars(_routing)["ACTIVE_COLLECTOR"]
 
 
 @pytest.fixture(autouse=True)
@@ -82,7 +82,7 @@ class Detonator:
 #: ``_ACTIVE`` is the formatting options' ``ContextVar``. Reading one allocates
 #: nothing, so the sweep in ``test_performance_invariants.py`` cannot see it and
 #: this is the only instrument that can.
-TRAPPED: Final = ("resolve_subject_name", "_ACTIVE_COLLECTOR", "_report", "_ACTIVE")
+TRAPPED: Final = ("resolve_subject_name", "ACTIVE_COLLECTOR", "report", "_ACTIVE")
 
 
 @pytest.fixture
@@ -166,7 +166,11 @@ def _record_failing_assertion(_code: object, _offset: int) -> None:
         if holder is not None and not name.startswith("_"):
             for klass in type(holder).__mro__:
                 if name in vars(klass):
-                    OBSERVED_FAILING.add((klass.__name__, name))
+                    # The class that declares an assertion is a seam's mixin, not
+                    # a subject. Recorded under the subject that carries it, so
+                    # this set and `PUBLIC_ASSERTIONS` speak the same names --
+                    # otherwise every core assertion reads as never seen failing.
+                    OBSERVED_FAILING.add((owning_subject(klass.__name__), name))
                     break
         frame = frame.f_back
 
@@ -174,17 +178,20 @@ def _record_failing_assertion(_code: object, _offset: int) -> None:
 def pytest_configure(config: pytest.Config) -> None:
     """Watch `_fail` and `_fail_narrowing` for the length of the session.
 
-    The two are read out of the class dictionary rather than as attributes, the
-    way ``_ACTIVE_COLLECTOR`` is above and for the same reason: a direct access
-    to a protected name across a module boundary is what pyright reports.
+    The two are read out of a class dictionary rather than as attributes, the
+    way ``ACTIVE_COLLECTOR`` is above and for the same reason: a direct access
+    to a protected name across a module boundary is what pyright reports. Read
+    from the base that declares them rather than from ``Expect``, which inherits
+    them: ``vars`` sees one class's own dictionary, so asking the assembled
+    subject would find nothing and the watch would silently cover no assertion.
     """
     del config
     try:
         sys.monitoring.use_tool_id(_TOOL_ID, _TOOL_NAME)
-    except ValueError:  # something else got there first; the report stands down
+    except ValueError:  # something else got there first; the report_failure stands down
         return
     for name in ("_fail", "_fail_narrowing"):
-        function: Any = vars(Expect)[name]
+        function: Any = vars(ExpectBase)[name]
         sys.monitoring.set_local_events(_TOOL_ID, function.__code__, sys.monitoring.events.PY_START)
     sys.monitoring.register_callback(
         _TOOL_ID, sys.monitoring.events.PY_START, _record_failing_assertion
@@ -194,7 +201,7 @@ def pytest_configure(config: pytest.Config) -> None:
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Report any assertion the whole run never once showed failing.
 
-    Only on a complete, green run. A subset would report everything it did not
+    Only on a complete, green run. A subset would report_failure everything it did not
     reach, and a run that already failed has a better message to show first.
     """
     if exitstatus != 0 or session.config.option.keyword or session.config.args != ["tests"]:

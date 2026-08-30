@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from lovely_assertions import AssertionFailure, Expect, expect, soft_assertions
+from lovely_assertions._core import _inspection
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -429,13 +430,12 @@ def test_the_guard_costs_nothing_on_the_happy_path(monkeypatch: pytest.MonkeyPat
     reached, so a guard that formatted first and decided afterwards would be
     caught here rather than in a benchmark.
     """
-    from lovely_assertions import _core
 
     def detonate(_outcome: bool, _predicate_form: str, /) -> str:
         message = "the guard built its message for a callback that asserted properly"
         raise AssertionError(message)
 
-    monkeypatch.setattr(_core, "_predicate_not_inspector", detonate)
+    monkeypatch.setattr(_inspection, "_predicate_not_inspector", detonate)
     expect(5).satisfies(lambda value: expect(value).is_positive())
     expect([1, 2]).all_satisfy(lambda item: expect(item).is_positive())
     expect([1]).satisfies_respectively(lambda item: expect(item).is_positive())

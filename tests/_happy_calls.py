@@ -857,6 +857,16 @@ def subject_classes() -> tuple[type, ...]:
 SUBJECT_CLASSES: Final = subject_classes()
 
 
+def owning_subject(declared_in: str, /) -> str:
+    """The subject a seam belongs to, given the mixin that declares it."""
+    if any(cls.__name__ == declared_in for cls in SUBJECT_CLASSES):
+        return declared_in
+    carriers = [
+        cls for cls in SUBJECT_CLASSES if any(base.__name__ == declared_in for base in cls.__mro__)
+    ]
+    return min(carriers, key=lambda cls: len(cls.__mro__)).__name__
+
+
 def public_assertions() -> list[tuple[str, str]]:
     """Every public method of every subject class, keyed by where it is defined.
 
@@ -864,14 +874,18 @@ def public_assertions() -> list[tuple[str, str]]:
     gives: a hand-written list drifts and nothing notices. Keying on the defining
     class rather than on each class that inherits the method keeps one entry per
     implementation instead of one per place it shows up.
+
+    A subject is assembled from one mixin per seam, so the class that *defines*
+    an assertion is usually not a subject at all. The owner is resolved back to
+    the most basic subject that carries the seam, which is the name a reader
+    knows the assertion by and the one they would look for in this table.
     """
     found: dict[tuple[str, str], None] = {}
     for cls in SUBJECT_CLASSES:
         for name, member in inspect.getmembers(cls, inspect.isfunction):
             if name.startswith("_"):
                 continue
-            owner = member.__qualname__.split(".")[0]
-            found[(owner, name)] = None
+            found[(owning_subject(member.__qualname__.split(".")[0]), name)] = None
     return sorted(found)
 
 
