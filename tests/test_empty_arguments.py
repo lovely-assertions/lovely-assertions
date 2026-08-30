@@ -23,7 +23,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from _happy_calls import SUBJECT_CLASSES, owning_subject
+from _happy_calls import SUBJECT_CLASSES, declaring_class, owning_subject
 from lovely_assertions import AssertionFailure, expect
 
 _VACUOUS: list[tuple[str, Callable[[], object]]] = [
@@ -162,8 +162,10 @@ def _variadic_assertions() -> list[tuple[str, str, object]]:
     the other guards, so this file walks whatever the package has rather than
     whatever someone remembered.
 
-    Keyed on the class that *defines* each assertion, so an inherited one is
-    exercised once rather than once per subclass.
+    Keyed on the subject that *carries* each assertion, so an inherited one is
+    exercised once rather than once per subclass. A subject is assembled from one
+    mixin per seam, so the class a method is declared on is usually not a subject
+    at all and has no specimen -- keying on it drops the assertion instead.
     """
     specimens = _specimens()
     found: dict[tuple[str, str], tuple[str, str, object]] = {}
@@ -174,7 +176,7 @@ def _variadic_assertions() -> list[tuple[str, str, object]]:
             parameters = inspect.signature(member).parameters.values()
             if not any(p.kind is inspect.Parameter.VAR_POSITIONAL for p in parameters):
                 continue
-            owner = member.__qualname__.split(".")[0]
+            owner = owning_subject(declaring_class(cls, name))
             subject = specimens.get(owner)
             if subject is not None:
                 found[(owner, name)] = (owner, name, subject)
@@ -190,7 +192,7 @@ def _variadic_owners() -> set[str]:
                 continue
             parameters = inspect.signature(member).parameters.values()
             if any(p.kind is inspect.Parameter.VAR_POSITIONAL for p in parameters):
-                owners.add(owning_subject(member.__qualname__.split(".")[0]))
+                owners.add(owning_subject(declaring_class(cls, name)))
     return owners
 
 

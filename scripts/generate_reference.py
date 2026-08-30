@@ -255,6 +255,32 @@ def _banner_between(lines: list[str], start: int, end: int) -> str:
     return found
 
 
+def _is_seam(rendered: str, /) -> bool:
+    """Whether a base is one this package's decomposition introduced.
+
+    A subject is assembled from one mixin per seam over a root they share, and
+    none of those has a section on this page. Naming one would send a reader
+    looking for a heading that does not exist.
+    """
+    stem = rendered.partition("[")[0]
+    return stem.endswith(("Assertions", "Base"))
+
+
+def _through_the_seams(bases: list[str], class_name: str, /) -> list[str]:
+    """What a subject inherits, once its seams are looked past."""
+    roots = {name.partition("[")[0] for name in bases if name.partition("[")[0].endswith("Base")}
+    for base_module, base_name, _ in SHARED_BASES.get(class_name, ()):
+        if base_name not in roots:
+            continue
+        tree = ast.parse((SRC / base_module).read_text(encoding="utf-8"))
+        node = next(
+            item for item in tree.body if isinstance(item, ast.ClassDef) and item.name == base_name
+        )
+        aliases = _aliases(tree)
+        return [rendered for base in node.bases if not _is_seam(rendered := _base(base, aliases))]
+    return []
+
+
 def read_subject(module: str, class_name: str, display: str) -> Subject:
     path = SRC / module
     source = path.read_text(encoding="utf-8")
@@ -272,14 +298,15 @@ def read_subject(module: str, class_name: str, display: str) -> Subject:
         # cannot see and must not depend on. Every other base stays: what a
         # subject inherits from another subject, or from a base the prose around
         # it refers to, is something they act on.
-        bases = [
-            rendered
-            for base in node.bases
-            if (stem := (rendered := _base(base, aliases)).partition("[")[0]) != "ExpectBase"
-            and not stem.endswith("Assertions")
-        ]
-        if bases:
-            declaration += "(" + ", ".join(bases) + ")"
+        bases = [_base(base, aliases) for base in node.bases]
+        shown = [name for name in bases if not _is_seam(name)]
+        if not shown:
+            # Every base is a seam, so the subject would declare nothing at all.
+            # Resolve through the root the seams share: what it inherits is what
+            # the subject inherits, and that is what a reader acts on.
+            shown = _through_the_seams(bases, class_name)
+        if shown:
+            declaration += "(" + ", ".join(shown) + ")"
     subject = Subject(name=class_name, display=display, declaration=declaration)
 
     overloads: dict[str, list[str]] = {}
@@ -824,7 +851,7 @@ TARGETS: list[tuple[str, str, str]] = [
     ("_string/__init__.py", "StringExpect", "StringExpect"),
     ("_ordered.py", "OrderedExpect", "OrderedExpect[T]"),
     ("_numeric.py", "NumericExpect", "NumericExpect"),
-    ("_collection.py", "CollectionExpect", "CollectionExpect[E, C]"),
+    ("_collection/__init__.py", "CollectionExpect", "CollectionExpect[E, C]"),
     ("_sequence.py", "SequenceExpect", "SequenceExpect[E]"),
     ("_mapping.py", "MappingExpect", "MappingExpect[K, V]"),
     ("_datetime.py", "DateExpect", "DateExpect[T]"),
@@ -849,6 +876,25 @@ TARGETS: list[tuple[str, str, str]] = [
 #: banner. ``DateTimeExpect`` takes only the clock half: it inherits
 #: ``DateExpect``, which already carries the ordering half.
 SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "CollectionExpect": (
+        ("_collection/_base.py", "CollectionBase", "Message positions"),
+        ("_collection/_emptiness.py", "EmptinessAssertions", "Emptiness"),
+        ("_collection/_length.py", "LengthAssertions", "Length"),
+        ("_collection/_containment.py", "ContainmentAssertions", "Containment"),
+        ("_collection/_predicates.py", "PredicateAssertions", "Containment"),
+        ("_collection/_screening.py", "ScreeningAssertions", "Containment"),
+        ("_collection/_relations.py", "RelationAssertions", "Set-like relations"),
+        ("_collection/_overlap.py", "OverlapAssertions", "Set-like relations"),
+        ("_collection/_multi_item.py", "MultiItemAssertions", "Multi-item membership"),
+        ("_collection/_element_types.py", "ElementTypeAssertions", "Element types"),
+        ("_collection/_nested.py", "NestedAssertions", "Nested assertions"),
+        (
+            "_collection/_wildcards.py",
+            "WildcardAssertions",
+            "Wildcard matching (string collections)",
+        ),
+        ("_collection/_projection.py", "ProjectionAssertions", "Projection"),
+    ),
     "StringExpect": (
         ("_string/_size.py", "SizeAssertions", "Emptiness"),
         ("_string/_caseless.py", "CaselessEqualityAssertions", "Caseless equality"),

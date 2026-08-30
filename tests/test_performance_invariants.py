@@ -90,7 +90,7 @@ from benchmarks import (
 )
 
 import lovely_assertions
-from _happy_calls import HAPPY_CALLS, SUBJECT_CLASSES, World
+from _happy_calls import HAPPY_CALLS, SUBJECT_CLASSES, World, declared_by_the_subject
 from conftest import measured
 from lovely_assertions import Expect, MockExpect, expect, expect_raises, expect_warns
 
@@ -421,26 +421,6 @@ def _calls_the_method_it_names(
     return code is not None and method_name in code.co_names
 
 
-def _declared_by_the_subject(subject_class: type, /) -> dict[str, object]:
-    """Everything the subject's own seams declare, and nothing a parent's do.
-
-    A subject is built from one mixin per seam, so ``vars(subject_class)`` holds
-    none of its assertions. Its own bases are walked instead, stopping at the
-    first one a *different* exported subject also has -- which is where this
-    subject stops being the thing under measurement.
-    """
-    others = [cls for cls in SUBJECT_CLASSES if cls is not subject_class]
-    shared = {base for cls in others for base in cls.__mro__ if base not in subject_class.__mro__}
-    del shared
-    inherited = {base for cls in others if issubclass(subject_class, cls) for base in cls.__mro__}
-    declared: dict[str, object] = {}
-    for base in reversed(subject_class.__mro__):
-        if base in inherited or base is object:
-            continue
-        declared.update(vars(base))
-    return declared
-
-
 def test_every_exported_subject_class_is_covered() -> None:
     """The table is a sample; it must not silently become an outdated one.
 
@@ -471,7 +451,7 @@ def test_every_exported_subject_class_is_covered() -> None:
         # A subject is assembled from one mixin per seam, so its own dictionary
         # holds nothing. What counts as its own is what its seams declare, which
         # stops at the first base a *different* subject also has.
-        defined: dict[str, object] = _declared_by_the_subject(subject_class)
+        defined: dict[str, object] = declared_by_the_subject(subject_class)
         if method_name not in defined:
             inherited.append(case.label)
         elif not _calls_the_method_it_names(case.assertion, defined[method_name], method_name):

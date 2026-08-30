@@ -170,7 +170,7 @@ def _record_failing_assertion(_code: object, _offset: int) -> None:
                     # a subject. Recorded under the subject that carries it, so
                     # this set and `PUBLIC_ASSERTIONS` speak the same names --
                     # otherwise every core assertion reads as never seen failing.
-                    OBSERVED_FAILING.add((owning_subject(klass.__name__), name))
+                    OBSERVED_FAILING.add((owning_subject(klass), name))
                     break
         frame = frame.f_back
 

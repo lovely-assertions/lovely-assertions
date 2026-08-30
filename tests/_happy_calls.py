@@ -865,14 +865,48 @@ def subject_classes() -> tuple[type, ...]:
 SUBJECT_CLASSES: Final = subject_classes()
 
 
-def owning_subject(declared_in: str, /) -> str:
-    """The subject a seam belongs to, given the mixin that declares it."""
-    if any(cls.__name__ == declared_in for cls in SUBJECT_CLASSES):
-        return declared_in
-    carriers = [
-        cls for cls in SUBJECT_CLASSES if any(base.__name__ == declared_in for base in cls.__mro__)
-    ]
+def declared_by_the_subject(subject_class: type, /) -> dict[str, object]:
+    """Everything the subject's own seams declare, and nothing a parent's do.
+
+    A subject is built from one mixin per seam, so ``vars(subject_class)`` holds
+    none of its assertions. Its own bases are walked instead, stopping at the
+    first one a *different* exported subject also has -- which is where this
+    subject stops being the thing under measurement.
+    """
+    others = [cls for cls in SUBJECT_CLASSES if cls is not subject_class]
+    shared = {base for cls in others for base in cls.__mro__ if base not in subject_class.__mro__}
+    del shared
+    inherited = {base for cls in others if issubclass(subject_class, cls) for base in cls.__mro__}
+    declared: dict[str, object] = {}
+    for base in reversed(subject_class.__mro__):
+        if base in inherited or base is object:
+            continue
+        declared.update(vars(base))
+    return declared
+
+
+def owning_subject(declared_in: type, /) -> str:
+    """The subject a seam belongs to, given the class that declares the method.
+
+    Takes the class object rather than its name. Two packages both name a seam
+    ``WildcardAssertions`` -- strings match a pattern and so do collections of
+    them -- and resolving by name attributed one package's assertions to the
+    other's subject, which is a guard measuring the wrong thing while staying
+    green.
+
+    The most basic carrier wins: a seam of ``CollectionExpect`` is reached from
+    ``SequenceExpect`` too, and the assertion belongs to the class that declares
+    the catalogue rather than to every class that inherits it.
+    """
+    if declared_in in SUBJECT_CLASSES:
+        return declared_in.__name__
+    carriers = [cls for cls in SUBJECT_CLASSES if declared_in in cls.__mro__]
     return min(carriers, key=lambda cls: len(cls.__mro__)).__name__
+
+
+def declaring_class(cls: type, name: str, /) -> type:
+    """The class in ``cls``'s MRO that actually declares ``name``."""
+    return next(base for base in cls.__mro__ if name in vars(base))
 
 
 def public_assertions() -> list[tuple[str, str]]:
@@ -890,10 +924,10 @@ def public_assertions() -> list[tuple[str, str]]:
     """
     found: dict[tuple[str, str], None] = {}
     for cls in SUBJECT_CLASSES:
-        for name, member in inspect.getmembers(cls, inspect.isfunction):
+        for name, _ in inspect.getmembers(cls, inspect.isfunction):
             if name.startswith("_"):
                 continue
-            found[(owning_subject(member.__qualname__.split(".")[0]), name)] = None
+            found[(owning_subject(declaring_class(cls, name)), name)] = None
     return sorted(found)
 
 
