@@ -841,6 +841,13 @@ def subject_classes() -> tuple[type, ...]:
     whether or not anyone remembers this file. ``WithinDelta`` is the one thing
     the derivation cannot reach: it is not an :class:`Expect` at all, but
     ``is_within(...).before(...)`` is a public assertion, so it is named.
+
+    A *seam* is left out. Every subject is assembled from one mixin per seam, and
+    a mixin is an :class:`Expect` subclass like any other -- but it is never what
+    ``expect()`` hands back, so counting it as a subject would report every
+    assertion twice and attribute each to a class no reader has heard of. Seams
+    are named ``<Something>Assertions``, and
+    :func:`test_no_seam_is_ever_handed_back_by_expect` is what holds them to it.
     """
     classes: dict[type, None] = {}
     for module in library_modules():
@@ -849,6 +856,7 @@ def subject_classes() -> tuple[type, ...]:
                 isinstance(member, type)
                 and issubclass(member, Expect)
                 and member.__module__.startswith("lovely_assertions")
+                and not member.__name__.endswith("Assertions")
             ):
                 classes[member] = None
     return (*sorted(classes, key=lambda cls: cls.__qualname__), WithinDelta)

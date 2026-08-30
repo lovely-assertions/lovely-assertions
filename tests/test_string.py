@@ -50,8 +50,6 @@ from lovely_assertions import (
     AssertionFailure,
     Expect,
     StringExpect,
-    _string,
-    _text,
     expect,
     soft_assertions,
 )
@@ -67,6 +65,9 @@ from lovely_assertions._occurrence import (
     once,
     twice,
 )
+from lovely_assertions._string import _faults, _render
+from lovely_assertions._string import _uuid as _uuid_module
+from lovely_assertions._text import _compiled
 
 
 @pytest.mark.usefixtures("no_failure_machinery")
@@ -1840,7 +1841,7 @@ def test_a_formatter_is_handed_the_elided_text_and_not_the_whole_document() -> N
 @pytest.fixture
 def no_value_rendering(monkeypatch: pytest.MonkeyPatch) -> None:
     """Booby-trap the registry lookup, which no passing assertion may reach."""
-    monkeypatch.setattr(_string, "format_value", Detonator())
+    monkeypatch.setattr(_render, "format_value", Detonator())
 
 
 @pytest.mark.usefixtures("no_value_rendering")
@@ -1995,16 +1996,16 @@ def test_a_pattern_is_compiled_once_and_then_looked_up(
     Counted on the compile step, so removing the table turns this red rather than
     leaving it green and slower.
     """
-    regexes: dict[object, object] = getattr(_text, "_REGEXES")  # noqa: B009
+    regexes: dict[object, object] = getattr(_compiled, "_REGEXES")  # noqa: B009
     regexes.clear()
     compilations = [0]
-    original = getattr(_text, "_compile_regex")  # noqa: B009
+    original = getattr(_compiled, "_compile_regex")  # noqa: B009
 
     def counted(pattern: object, /) -> object:
         compilations[0] += 1
         return original(pattern)
 
-    monkeypatch.setattr(_text, "_compile_regex", counted)
+    monkeypatch.setattr(_compiled, "_compile_regex", counted)
     subject = expect("hello world")
     for _ in range(50):
         subject.matches("wor")
@@ -2014,7 +2015,7 @@ def test_a_pattern_is_compiled_once_and_then_looked_up(
 
 def test_a_compiled_pattern_is_accepted_and_pooled() -> None:
     """``re.compile`` hands a compiled pattern straight back, so both spellings pool."""
-    regexes: dict[object, object] = getattr(_text, "_REGEXES")  # noqa: B009
+    regexes: dict[object, object] = getattr(_compiled, "_REGEXES")  # noqa: B009
     regexes.clear()
     pattern = re.compile("wor")
     expect("hello world").matches(pattern)
@@ -2025,8 +2026,8 @@ def test_a_compiled_pattern_is_accepted_and_pooled() -> None:
 
 def test_the_pattern_table_is_bounded() -> None:
     """A suite that builds a pattern per case must not pin one compiled regex each."""
-    regexes: dict[object, object] = getattr(_text, "_REGEXES")  # noqa: B009
-    bound: int = getattr(_text, "_MAX_MATCHERS")  # noqa: B009
+    regexes: dict[object, object] = getattr(_compiled, "_REGEXES")  # noqa: B009
+    bound: int = getattr(_compiled, "_MAX_MATCHERS")  # noqa: B009
     regexes.clear()
     for index in range(bound + 10):
         expect("hello world").matches("hello" + "|zz" + str(index))
@@ -2120,7 +2121,7 @@ def test_class_fault_still_answers_when_no_character_is_at_fault() -> None:
     ``None`` spliced into the middle of a failure message.
     """
     class_fault: Callable[[str, Callable[[str], bool]], str] = getattr(  # noqa: B009
-        _string, "_class_fault"
+        _faults, "class_fault"
     )
 
     clause = class_fault("abc", lambda _char: True)
@@ -2130,7 +2131,7 @@ def test_class_fault_still_answers_when_no_character_is_at_fault() -> None:
 
 def test_title_fault_still_answers_when_the_walk_finds_no_fault() -> None:
     """``_title_fault`` ends in a clause when handed a string that *is* title case."""
-    title_fault: Callable[[str], str] = getattr(_string, "_title_fault")  # noqa: B009
+    title_fault: Callable[[str], str] = getattr(_faults, "title_fault")  # noqa: B009
 
     clause = title_fault("Hello World")
 
@@ -2146,7 +2147,7 @@ def test_identifier_fault_still_answers_when_every_character_is_valid() -> None:
     passes both halves. The clause is the guard against a future caller that
     does.
     """
-    identifier_fault: Callable[[str], str] = getattr(_string, "_identifier_fault")  # noqa: B009
+    identifier_fault: Callable[[str], str] = getattr(_faults, "identifier_fault")  # noqa: B009
 
     clause = identifier_fault("name_1")
 
@@ -2160,7 +2161,7 @@ def test_uuid_fault_still_answers_when_the_body_is_thirty_two_hexadecimal_digits
     non-hexadecimal character, so this pair never reaches it. Asked anyway, the
     answer is a sentence about the subject rather than ``None``.
     """
-    uuid_fault: Callable[[str, str], str] = getattr(_string, "_uuid_fault")  # noqa: B009
+    uuid_fault: Callable[[str, str], str] = getattr(_uuid_module, "uuid_fault")  # noqa: B009
 
     clause = uuid_fault("b7f8b4d0-3a1e-4f2b-9c6a-1d2e3f4a5b6c", "b7f8b4d03a1e4f2b9c6a1d2e3f4a5b6c")
 
