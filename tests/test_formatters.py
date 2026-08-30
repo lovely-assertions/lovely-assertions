@@ -30,11 +30,11 @@ from typing import Any, Final, cast
 
 import pytest
 
-from lovely_assertions import _formatters
 from lovely_assertions._formatters import (
     IterableFormatter,
     ObjectFormatter,
     ValueFormatter,
+    _registry,
     format_value,
     pop_formatters,
     push_formatters,
@@ -269,7 +269,7 @@ def clean_registry(monkeypatch: pytest.MonkeyPatch) -> list[ValueFormatter]:
     than mutating the one the library is running on.
     """
     registry: list[ValueFormatter] = []
-    monkeypatch.setattr(_formatters, "_GLOBAL", registry)
+    monkeypatch.setattr(_registry, "GLOBAL", registry)
     return registry
 
 
@@ -684,8 +684,8 @@ def test_the_global_registry_refuses_to_grow_without_bound() -> None:
     The cost is not only memory: every registration lengthens the list
     ``format_value`` walks for every value in every failure message.
     """
-    registry: list[object] = getattr(_formatters, "_GLOBAL")  # noqa: B009
-    bound: int = getattr(_formatters, "_MAX_GLOBAL")  # noqa: B009
+    registry: list[object] = getattr(_registry, "GLOBAL")  # noqa: B009
+    bound: int = getattr(_registry, "_MAX_GLOBAL")  # noqa: B009
     kept = list(registry)
     try:
         registry.clear()

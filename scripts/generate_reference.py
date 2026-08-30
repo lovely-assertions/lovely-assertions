@@ -927,14 +927,14 @@ EXTRAS: list[tuple[str, tuple[tuple[str, str, str], ...]]] = [
     (
         "How values are rendered",
         (
-            ("_formatting.py", "class", "FormattingOptions"),
-            ("_formatting.py", "function", "formatting"),
-            ("_formatting.py", "function", "current_formatting"),
-            ("_formatters.py", "function", "register_formatter"),
-            ("_formatters.py", "class", "ValueFormatter"),
-            ("_formatters.py", "class", "ObjectFormatter"),
-            ("_formatters.py", "class", "IterableFormatter"),
-            ("_formatters.py", "function", "format_value"),
+            ("_formatting/_options.py", "class", "FormattingOptions"),
+            ("_formatting/_scope.py", "function", "formatting"),
+            ("_formatting/_scope.py", "function", "current_formatting"),
+            ("_formatters/_registry.py", "function", "register_formatter"),
+            ("_formatters/_protocol.py", "class", "ValueFormatter"),
+            ("_formatters/_builtin.py", "class", "ObjectFormatter"),
+            ("_formatters/_builtin.py", "class", "IterableFormatter"),
+            ("_formatters/_render.py", "function", "format_value"),
         ),
     ),
     (

@@ -36,7 +36,7 @@ from benchmarks import blocks_allocated
 from conftest import Detonator
 from lovely_assertions import _formatting, expect
 from lovely_assertions._exceptions import hide_internal_frames
-from lovely_assertions._formatting import FormattingOptions, current_formatting, formatting
+from lovely_assertions._formatting import FormattingOptions, _scope, current_formatting, formatting
 
 #: The limits every message is rendered with when no scope is open. They are
 #: pinned as literals rather than read back from ``_diff``/``_string``: this is
@@ -424,7 +424,7 @@ def test_scopes_are_isolated_between_concurrent_tasks() -> None:
 @pytest.fixture
 def no_options_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
     """Booby-trap the options ``ContextVar`` the way ``test_happy_path`` traps ``_fail``."""
-    monkeypatch.setattr(_formatting, "_ACTIVE", Detonator())
+    monkeypatch.setattr(_scope, "_ACTIVE", Detonator())
 
 
 @pytest.mark.usefixtures("no_options_lookup")
