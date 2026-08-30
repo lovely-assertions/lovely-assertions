@@ -1100,3 +1100,30 @@ def test_the_builder_set_is_derived_and_not_empty() -> None:
     assert "format_value" in builders
     assert "render_operand" in builders
     assert {"_clipped", "rendered"} <= builders
+
+
+def test_no_seam_is_ever_handed_back_by_expect() -> None:
+    """A seam is a mixin, and `tests/_happy_calls.py` leaves it out on that basis.
+
+    Every subject is assembled from one mixin per seam, and a mixin is an
+    ``Expect`` subclass like any other -- so the derivation that finds subjects
+    has to tell the two apart, and it does it by name. If a seam were ever what
+    ``expect()`` returns, that name would be excluding a real subject and every
+    assertion on it would silently stop being covered.
+    """
+    from _happy_calls import library_modules
+
+    seams = {
+        member
+        for module in library_modules()
+        for member in vars(module).values()
+        if isinstance(member, type) and member.__name__.endswith("Assertions")
+    }
+    assert seams, "the convention describes nothing; the derivation is excluding by a dead rule"
+
+    handed_back = {
+        type(expect(sample))
+        for sample in ("s", 1, True, 1.5, [1], (1,), {1}, {"a": 1}, None, b"b", object())
+    }
+
+    assert not seams & handed_back

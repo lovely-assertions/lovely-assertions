@@ -266,11 +266,19 @@ def read_subject(module: str, class_name: str, display: str) -> Subject:
     declaration = "class " + class_name + _type_params(node)
     if node.bases:
         aliases = _aliases(tree)
-        bases = [_base(base, aliases) for base in node.bases]
-        # A subject built from one mixin per seam lists ten bases nobody outside
-        # the package can name. The arrangement is real and the reference is not
-        # where it is documented; a reader here wants the subject it produces.
-        if not any(name.endswith("Assertions" + _type_params(node)) for name in bases):
+        # The seams a subject is assembled from are left out. Each is one file's
+        # worth of assertions, listed under its own heading further down, and
+        # naming the class here would tell a reader about an arrangement they
+        # cannot see and must not depend on. Every other base stays: what a
+        # subject inherits from another subject, or from a base the prose around
+        # it refers to, is something they act on.
+        bases = [
+            rendered
+            for base in node.bases
+            if (stem := (rendered := _base(base, aliases)).partition("[")[0]) != "ExpectBase"
+            and not stem.endswith("Assertions")
+        ]
+        if bases:
             declaration += "(" + ", ".join(bases) + ")"
     subject = Subject(name=class_name, display=display, declaration=declaration)
 
@@ -813,7 +821,7 @@ class Colour(Enum):
 TARGETS: list[tuple[str, str, str]] = [
     ("_core/__init__.py", "Expect", "Expect[T]"),
     ("_bool.py", "BoolExpect", "BoolExpect"),
-    ("_string.py", "StringExpect", "StringExpect"),
+    ("_string/__init__.py", "StringExpect", "StringExpect"),
     ("_ordered.py", "OrderedExpect", "OrderedExpect[T]"),
     ("_numeric.py", "NumericExpect", "NumericExpect"),
     ("_collection.py", "CollectionExpect", "CollectionExpect[E, C]"),
@@ -841,6 +849,21 @@ TARGETS: list[tuple[str, str, str]] = [
 #: banner. ``DateTimeExpect`` takes only the clock half: it inherits
 #: ``DateExpect``, which already carries the ordering half.
 SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "StringExpect": (
+        ("_string/_size.py", "SizeAssertions", "Emptiness"),
+        ("_string/_caseless.py", "CaselessEqualityAssertions", "Caseless equality"),
+        ("_string/_containment.py", "ContainmentAssertions", "Containment"),
+        ("_string/_containment_many.py", "MultipleContainmentAssertions", "Containment"),
+        ("_string/_containment_caseless.py", "CaselessContainmentAssertions", "Containment"),
+        ("_string/_edges.py", "EdgeAssertions", "Edges"),
+        ("_string/_regex.py", "RegexAssertions", "Regular expressions"),
+        ("_string/_wildcards.py", "WildcardAssertions", "Wildcards"),
+        ("_string/_case.py", "CaseAssertions", "Case"),
+        ("_string/_classes_letters.py", "LetterClassAssertions", "Character classes"),
+        ("_string/_classes_encoding.py", "EncodingClassAssertions", "Character classes"),
+        ("_string/_identifier.py", "IdentifierAssertions", "Identifiers"),
+        ("_string/_uuid.py", "UuidAssertions", "UUIDs"),
+    ),
     "Expect": (
         ("_core/_base.py", "ExpectBase", "Continuations"),
         ("_core/_truthiness.py", "TruthinessAssertions", "Truthiness"),

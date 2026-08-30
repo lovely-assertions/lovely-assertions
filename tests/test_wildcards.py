@@ -15,13 +15,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from lovely_assertions import AssertionFailure, _text, expect
-from lovely_assertions._text import (
+from lovely_assertions import AssertionFailure, expect
+from lovely_assertions._text import _compiled, _translation, matches_wildcard, wildcard_matcher
+from lovely_assertions._text._compiled import (
     _MATCHERS,  # pyright: ignore[reportPrivateUsage]
     _MATCHERS_IGNORING_CASE,  # pyright: ignore[reportPrivateUsage]
     _MAX_MATCHERS,  # pyright: ignore[reportPrivateUsage]
-    matches_wildcard,
-    wildcard_matcher,
 )
 
 if TYPE_CHECKING:
@@ -345,13 +344,13 @@ def _counting_translations(monkeypatch: pytest.MonkeyPatch) -> "Callable[[], int
     taken away, which is the regression this exists to catch.
     """
     calls = [0]
-    original = _text._wildcard_source  # pyright: ignore[reportPrivateUsage]
+    original = _translation.wildcard_source
 
     def counted(pattern: str, escape: "Callable[[str], str]", /) -> str:
         calls[0] += 1
         return original(pattern, escape)
 
-    monkeypatch.setattr(_text, "_wildcard_source", counted)
+    monkeypatch.setattr(_compiled, "wildcard_source", counted)
     return lambda: calls[0]
 
 
