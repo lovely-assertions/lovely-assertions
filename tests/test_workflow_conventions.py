@@ -14,6 +14,7 @@ imported to read six files whose formatting this repository controls.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Final
@@ -78,6 +79,109 @@ def test_every_action_is_pinned_to_a_sha_and_says_which_version(workflow: Path) 
     assert not uncommented, (
         "a pinned SHA carries the version it stands for in a trailing comment "
         f"(`# v1.2.3`), or nobody can review the bump: {uncommented}"
+    )
+
+
+#: Owners GitHub counts as its own. The repository's Actions policy is set to
+#: *selected* actions with ``github_owned_allowed``, so anything under these is
+#: permitted without being listed.
+GITHUB_OWNED: Final = ("actions", "github")
+
+#: Every third-party action this repository is allowed to run, and the whole
+#: list. It is a copy: the policy itself lives in the repository's Actions
+#: settings, where nothing in this tree can read it.
+#:
+#: That copy is the point. An action absent from the *setting* does not fail a
+#: pull request -- it fails the workflow at startup, after the merge, with no
+#: annotation saying why, because a workflow that cannot start produces no
+#: output to annotate. A pull request adding one can be green in every check and
+#: still be broken. Adding an entry here is the step that makes somebody go and
+#: add it there too.
+ALLOWED_THIRD_PARTY_ACTIONS: Final = (
+    "SonarSource/sonarqube-scan-action",
+    "astral-sh/setup-uv",
+    "googleapis/release-please-action",
+    "ossf/scorecard-action",
+    "pypa/gh-action-pypi-publish",
+)
+
+
+@pytest.mark.parametrize("workflow", WORKFLOW_FILES, ids=_identifier)
+def test_every_action_is_one_the_repository_is_allowed_to_run(workflow: Path) -> None:
+    """An action outside the allow-list fails at startup, not at review.
+
+    The failure mode this covers is the quiet one. GitHub refuses to start a
+    workflow using an action the policy does not permit, and reports it as a
+    startup failure with no annotation -- so the diagnosis is a guess unless
+    somebody already knows the policy exists.
+    """
+    disallowed: list[str] = []
+
+    for number, line in enumerate(workflow.read_text(encoding="utf-8").splitlines(), start=1):
+        match = PINNED_USE.match(line)
+        if match is None:
+            continue
+        action = match["action"]
+        owner = action.split("/", 1)[0]
+        if owner in GITHUB_OWNED:
+            continue
+        # A path into a repository (`owner/repo/subdir`) is still that repository.
+        repository = "/".join(action.split("/")[:2])
+        if repository not in ALLOWED_THIRD_PARTY_ACTIONS:
+            disallowed.append(f"{workflow.name}:{number} {action}")
+
+    assert not disallowed, (
+        f"these actions are not on the repository's allow-list: {disallowed}. "
+        f"Add them to `ALLOWED_THIRD_PARTY_ACTIONS` *and* to the repository's "
+        f"Actions settings -- adding only one of the two leaves a workflow that "
+        f"passes review and then refuses to start."
+    )
+
+
+def test_the_tag_release_please_creates_is_the_tag_the_release_workflow_waits_for() -> None:
+    """Two files have to agree about one string, and nothing else makes them.
+
+    release-please tags the release; ``release.yml`` triggers on a tag pattern.
+    Neither reads the other, and the defaults do not match: ``include-
+    component-in-tag`` defaults to *true*, which would tag
+    ``lovely-assertions-v0.1.0`` -- a tag ``v*`` does not select.
+
+    The failure that follows is the expensive kind, because every visible part of
+    it succeeds. The release pull request merges, the version is written, the tag
+    is pushed and the GitHub release appears; only the publish never runs, and
+    nothing says so. It reads as "the release worked" until somebody looks for
+    the version on PyPI.
+    """
+    config = json.loads((REPO_ROOT / "release-please-config.json").read_text(encoding="utf-8"))
+    package = config["packages"]["."]
+
+    assert package.get("include-component-in-tag") is False, (
+        "release-please must not put the component in the tag: it defaults to true, "
+        "which tags `lovely-assertions-vX.Y.Z`, and release.yml only wakes for `v*`."
+    )
+    assert package.get("include-v-in-tag") is not False, (
+        "release-please must keep the `v` in the tag, which is what release.yml selects on."
+    )
+
+    release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
+    assert 'tags: ["v*"]' in release, (
+        "release.yml no longer triggers on `v*`. Whatever it triggers on now has to "
+        "match the tag release-please creates, and this test has to say so."
+    )
+
+
+def test_the_allow_list_has_no_stale_entries() -> None:
+    """An entry nothing uses is a permission granted for no reason."""
+    used = {
+        "/".join(match["action"].split("/")[:2])
+        for workflow in WORKFLOW_FILES
+        for line in workflow.read_text(encoding="utf-8").splitlines()
+        if (match := PINNED_USE.match(line)) is not None
+    }
+    unused = sorted(set(ALLOWED_THIRD_PARTY_ACTIONS) - used)
+    assert not unused, (
+        f"`ALLOWED_THIRD_PARTY_ACTIONS` permits actions no workflow uses: {unused}. "
+        f"Remove them here and from the repository's Actions settings."
     )
 
 
