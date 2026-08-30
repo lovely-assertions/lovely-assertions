@@ -864,7 +864,7 @@ _ALLOCATES_BY_DESIGN: Final[dict[_Key, tuple[int, str]]] = {
     # -- timedeltas --------------------------------------------------
     ("TimeDeltaExpect", "is_close_to"): (16, _TIMEDELTA),
     ("TimeDeltaExpect", "is_not_close_to"): (16, _TIMEDELTA),
-    ("_ClockExpect", "is_aware"): (72, _TIMEDELTA),
+    ("ClockExpect", "is_aware"): (72, _TIMEDELTA),
     # -- floats ------------------------------------------------------
     ("TimeDeltaExpect", "has_total_seconds"): (64, _FLOAT),
     # -- Flag --------------------------------------------------------

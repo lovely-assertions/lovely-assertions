@@ -888,7 +888,7 @@ Expected server_config to contain key 'hostname' (did you mean 'host'?), but the
 ## `DateExpect[T]`
 
 ```python
-class DateExpect[T: date](_TemporalExpect[T]):
+class DateExpect[T: date](TemporalExpect[T]):
 ```
 
 Returned for a `date`. The ordering assertions come from a base shared with the
@@ -942,7 +942,7 @@ Expected invoice_date to fall on a weekday, but 2024-03-16 is a Saturday.
 ## `DateTimeExpect`
 
 ```python
-class DateTimeExpect(DateExpect[datetime], _ClockExpect[datetime]):
+class DateTimeExpect(DateExpect[datetime], ClockExpect[datetime]):
 ```
 
 Returned for a `datetime` — which *is* a `date`, so this subject is a
@@ -999,7 +999,7 @@ Expected recorded_at to be UTC, but 2024-03-16T14:30:00 is naive.
 ## `TimeExpect`
 
 ```python
-class TimeExpect(_ClockExpect[time]):
+class TimeExpect(ClockExpect[time]):
 ```
 
 Returned for a `time`: a clock reading with no date behind it. It shares the

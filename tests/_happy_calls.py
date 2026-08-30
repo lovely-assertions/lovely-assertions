@@ -672,29 +672,27 @@ HAPPY_CALLS: Final[dict[tuple[str, str], Callable[[World], object]]] = {
         .after(datetime(2020, 1, 1, tzinfo=UTC))
     ),
     ("TimeExpect", "is_midnight"): lambda _: expect(time(0, 0)).is_midnight(),
-    ("_ClockExpect", "has_hour"): lambda _: expect(time(9, 30, 15, 7)).has_hour(9),
-    ("_ClockExpect", "has_microsecond"): lambda _: expect(time(9, 30, 15, 7)).has_microsecond(7),
-    ("_ClockExpect", "has_minute"): lambda _: expect(time(9, 30, 15, 7)).has_minute(30),
-    ("_ClockExpect", "has_second"): lambda _: expect(time(9, 30, 15, 7)).has_second(15),
-    ("_ClockExpect", "is_aware"): lambda _: expect(time(9, 30, tzinfo=UTC)).is_aware(),
-    ("_ClockExpect", "is_naive"): lambda _: expect(time(9, 30)).is_naive(),
-    ("_TemporalExpect", "is_after"): lambda _: expect(date(2020, 1, 2)).is_after(date(2020, 1, 1)),
-    ("_TemporalExpect", "is_before"): lambda _: expect(date(2020, 1, 1)).is_before(
-        date(2020, 1, 2)
-    ),
-    ("_TemporalExpect", "is_between"): lambda _: expect(date(2020, 1, 2)).is_between(
+    ("ClockExpect", "has_hour"): lambda _: expect(time(9, 30, 15, 7)).has_hour(9),
+    ("ClockExpect", "has_microsecond"): lambda _: expect(time(9, 30, 15, 7)).has_microsecond(7),
+    ("ClockExpect", "has_minute"): lambda _: expect(time(9, 30, 15, 7)).has_minute(30),
+    ("ClockExpect", "has_second"): lambda _: expect(time(9, 30, 15, 7)).has_second(15),
+    ("ClockExpect", "is_aware"): lambda _: expect(time(9, 30, tzinfo=UTC)).is_aware(),
+    ("ClockExpect", "is_naive"): lambda _: expect(time(9, 30)).is_naive(),
+    ("TemporalExpect", "is_after"): lambda _: expect(date(2020, 1, 2)).is_after(date(2020, 1, 1)),
+    ("TemporalExpect", "is_before"): lambda _: expect(date(2020, 1, 1)).is_before(date(2020, 1, 2)),
+    ("TemporalExpect", "is_between"): lambda _: expect(date(2020, 1, 2)).is_between(
         date(2020, 1, 1), date(2020, 1, 3)
     ),
-    ("_TemporalExpect", "is_not_between"): lambda _: expect(date(2020, 6, 1)).is_not_between(
+    ("TemporalExpect", "is_not_between"): lambda _: expect(date(2020, 6, 1)).is_not_between(
         date(2020, 1, 1), date(2020, 1, 3)
     ),
-    ("_TemporalExpect", "is_on_or_after"): lambda _: expect(date(2020, 1, 1)).is_on_or_after(
+    ("TemporalExpect", "is_on_or_after"): lambda _: expect(date(2020, 1, 1)).is_on_or_after(
         date(2020, 1, 1)
     ),
-    ("_TemporalExpect", "is_on_or_before"): lambda _: expect(date(2020, 1, 1)).is_on_or_before(
+    ("TemporalExpect", "is_on_or_before"): lambda _: expect(date(2020, 1, 1)).is_on_or_before(
         date(2020, 1, 1)
     ),
-    ("_TemporalExpect", "is_strictly_between"): lambda _: expect(
+    ("TemporalExpect", "is_strictly_between"): lambda _: expect(
         date(2020, 1, 2)
     ).is_strictly_between(date(2020, 1, 1), date(2020, 1, 3)),
     ("TimeDeltaExpect", "has_total_seconds"): lambda _: expect(

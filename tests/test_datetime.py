@@ -26,12 +26,9 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from lovely_assertions import AssertionFailure, expect, soft_assertions
-from lovely_assertions._datetime import (
-    DateExpect,
-    DateTimeExpect,
-    _offending_bound,  # pyright: ignore[reportPrivateUsage]
-    rendered,
-)
+from lovely_assertions._datetime import DateExpect, DateTimeExpect
+from lovely_assertions._datetime._guards import offending_bound
+from lovely_assertions._datetime._render import rendered
 
 PARIS: Final = ZoneInfo("Europe/Paris")
 TOKYO: Final = ZoneInfo("Asia/Tokyo")
@@ -1225,8 +1222,8 @@ def test_a_range_names_the_bound_that_actually_refused() -> None:
     untested on the strength of an argument.
     """
     naive = datetime(2020, 6, 1)
-    assert _offending_bound(naive, date(2020, 1, 1), datetime(2021, 1, 1)) == date(2020, 1, 1)
-    assert _offending_bound(
+    assert offending_bound(naive, date(2020, 1, 1), datetime(2021, 1, 1)) == date(2020, 1, 1)
+    assert offending_bound(
         naive, datetime(2020, 1, 1), datetime(2021, 1, 1, tzinfo=UTC)
     ) == datetime(2021, 1, 1, tzinfo=UTC)
 
