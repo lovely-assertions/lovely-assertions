@@ -23,22 +23,21 @@ is a cost they did not choose. It will never grow a dependency.
 
 ## Installing
 
-Not published to PyPI yet. Install from the repository:
+```bash
+pip install lovely-assertions
+```
+
+With [uv](https://docs.astral.sh/uv/), which is what the project itself uses,
+and as a development dependency, which is where it belongs:
+
+```bash
+uv add --dev lovely-assertions
+```
+
+To install an unreleased change straight from the repository:
 
 ```bash
 pip install git+https://github.com/lovely-assertions/lovely-assertions
-```
-
-With [uv](https://docs.astral.sh/uv/), which is what the project itself uses:
-
-```bash
-uv add git+https://github.com/lovely-assertions/lovely-assertions
-```
-
-Once published, the usual will work:
-
-```bash
-pip install lovely-assertions
 ```
 
 The distribution is named `lovely-assertions`; the module you import is

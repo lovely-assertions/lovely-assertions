@@ -108,7 +108,7 @@ The questions that decide it, answered in one place.
 
 | | |
 |---|---|
-| **Maturity** | Pre-release, and **not on PyPI yet**. The catalogue, exception and warning assertions, the difference engine and the extension API are complete and tested; the version number is not yet meaningful. [Installation](getting-started/installation.md) covers installing from the repository. |
+| **Maturity** | First release. The catalogue, exception and warning assertions, the difference engine and the extension API are complete and tested. Before a 1.0 the surface can still move, so read the version as "usable and supported", not as "frozen". |
 | **Stability** | The public surface is `__all__`, and it is what the [reference](reference/assertions.md) documents. Until a 1.0, treat it as settled but not promised — changes are recorded in [CHANGELOG.md](../CHANGELOG.md). |
 | **Dependencies** | None, permanently, and that is a design commitment rather than a current state. Python 3.13+. |
 | **Cost to your suite** | A passing assertion is a comparison and a return: nothing retained, no message built. Importing the package imports almost nothing. [Performance](concepts/performance.md) says exactly what is measured and what is not. |

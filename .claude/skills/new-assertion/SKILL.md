@@ -84,8 +84,10 @@ are **one table written twice**. Edit both in the same change, in the same order
   every one of them is compared against what the library actually prints.
 - Public symbol? `src/lovely_assertions/__init__.py` **and** `__all__` — both, or
   neither; a test asserts they match.
-- A `CHANGELOG.md` entry under `## [Unreleased]`, written for a reader who will
-  never see the diff.
+- **No `CHANGELOG.md` edit.** That file is generated from the commit log by
+  git-cliff and hand-editing it is undone by the next regeneration. The commit
+  summary *is* the changelog entry, so write it for a reader who will never see
+  the diff; `uvx git-cliff==2.13.1 --unreleased` previews what yours will say.
 
 ## 5. Verify
 

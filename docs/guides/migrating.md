@@ -61,7 +61,7 @@ line.** Where the failure is already good, leave the `assert`.
 | pytest | Here |
 |---|---|
 | `pytest.raises(E)` | `expect_raises(E)` |
-| `pytest.raises(E, match="...")` | `expect_raises(E)` then `.with_message_containing(...)` |
+| `pytest.raises(E, match=r"...")` | `expect_raises(E)` then `.with_message(r"...")` — both are a `re.search`. Use `.with_message_containing("...")` for a plain substring |
 | `pytest.warns(W)` | `expect_warns(W)` |
 | `pytest.approx(x)` | `expect(v).is_close_to(x)` — [the same four calling forms](numbers.md#floating-point-is_close_to) |
 | `pytest.approx(x, rel=r)` | `expect(v).is_close_to(x, rel=r)` |

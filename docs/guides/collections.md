@@ -2,12 +2,18 @@
 
 `expect(some_collection)` gives you a `CollectionExpect` for a container that is
 neither a mapping nor a sequence — a `set`, a `frozenset`, a `dict` view. Lists
-and tuples get a [`SequenceExpect`](sequences.md) and a `dict` gets a
-[`MappingExpect`](mappings.md); **both inherit everything on this page** and add
-their own on top.
+and tuples get a [`SequenceExpect`](sequences.md), which **inherits everything on
+this page** and adds its own on top.
+
+A `dict` gets a [`MappingExpect`](mappings.md), and that one is deliberately
+*not* a `CollectionExpect`: a mapping is a collection of its keys, its values or
+its items depending on the question, and guessing which would be wrong more often
+than right. So it declares its own size assertions and reaches this catalogue
+through its `.keys` and `.values` views instead —
+`expect(config).keys.contains("host")`.
 
 So: read this page for any container, then [sequences](sequences.md) if yours has
-an order.
+an order, or [mappings](mappings.md) if it is a `dict`.
 
 > Full signatures: [`CollectionExpect[E, C]` in the reference](../reference/assertions.md#collectionexpecte-c).
 

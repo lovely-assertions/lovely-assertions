@@ -125,13 +125,47 @@ The handle from `expect_raises` is a subject over the exception:
 |---|---|
 | `with_message(pattern)` | `str(exception)` **matches the regex** `pattern` (a search, not a full match) |
 | `with_message_containing(text)` | `str(exception)` contains `text` |
-| `with_cause(Type)` | `__cause__` is an instance of `Type` |
-| `with_cause_exactly(Type)` | `__cause__` is exactly `Type` |
+| `with_cause(Type)` | the cause is an instance of `Type` — `__cause__` if set, otherwise `__context__` |
+| `with_cause_exactly(Type)` | the cause is exactly `Type`, looked up the same way |
 | `with_note(text)` | the exception carries that note |
 | `with_note_matching(pattern)` | a note matches the pattern |
 | `has_no_notes()` | there are none |
 | `.which` | a subject over the exception, for the generic catalogue |
 | `.subject` | the exception itself |
+
+### The cause assertions look at `__context__` too
+
+`raise X from Y` sets `__cause__`. A bare `raise X` inside an `except` block sets
+only `__context__` — the implicit chaining Python does for you — and that is far
+more common in code nobody wrote with a test in mind. So both cause assertions
+read `__cause__` first and fall back to `__context__`, and the failure names
+which of the two it ended up looking at.
+
+```python
+from lovely_assertions import expect_raises, AssertionFailure
+
+
+def load_config() -> None:
+    try:
+        raise KeyError("DATABASE_URL")
+    except KeyError:
+        raise RuntimeError("configuration is incomplete")
+
+
+with expect_raises(RuntimeError) as caught:
+    load_config()
+
+caught.with_cause(KeyError)  # passes: __cause__ is None, __context__ is the KeyError
+
+try:
+    caught.with_cause(TypeError)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected the value to have a cause of type TypeError, but __context__ was KeyError('DATABASE_URL').
+```
 
 ```python
 from lovely_assertions import expect_raises, AssertionFailure
@@ -295,8 +329,13 @@ want, but it is worth knowing which of the two you are asking for.
 
 ### `KeyboardInterrupt` and `SystemExit` pass through
 
-Neither is turned into an assertion failure. Both mean "stop", and a test
-framework that swallowed them would be unusable.
+Neither is turned into an assertion failure **when you did not ask for it**. Both
+mean "stop", and a test framework that swallowed an unrequested one would be
+unusable.
+
+Name it and it is caught like anything else — `expect(shutdown).raises(SystemExit)`
+works, and so does `does_not_raise(KeyboardInterrupt)` — because a type you named
+is the subject of the test rather than an interruption of it.
 
 ### `async def` is refused at the call
 

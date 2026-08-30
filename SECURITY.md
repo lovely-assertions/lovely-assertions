@@ -58,6 +58,11 @@ does not name, evaluating source it was not given — is.
 - Every artifact carries a signed
   [build provenance attestation](https://github.com/lovely-assertions/lovely-assertions/attestations)
   linking it to the commit and workflow that produced it.
-- Every GitHub Action is pinned to a full commit SHA; workflows are audited by
-  `zizmor` on every change, and the locked development tree by `pip-audit`
-  weekly.
+- Every GitHub Action is pinned to a full commit SHA. `zizmor` audits the whole
+  repository — the workflows, `dependabot.yml` and the pre-commit configuration —
+  and `pip-audit` checks the locked development tree. Both run on every push to
+  `main`, on any pull request touching a workflow, `uv.lock` or `pyproject.toml`,
+  and again on a weekly schedule, so a finding published after a change still
+  surfaces without one.
+- Dependabot keeps the Actions and the development dependencies current, and its
+  pull requests go through the same required checks as any other.

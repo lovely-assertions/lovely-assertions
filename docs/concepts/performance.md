@@ -82,9 +82,13 @@ and `linecache` are reached only from a failure path; `re` and `uuid` are reache
 by the assertions built on them — a *passing* `matches(...)` imports `re` — which
 is still a suite that never uses them never paying for them.
 
-`datetime`, `enum` and `pathlib` are never imported at runtime at all: the
-subjects that assert on them are typed against them under `TYPE_CHECKING` and
-matched by name.
+`datetime` and `pathlib` are never imported at all: the subjects that assert on
+them are typed against them under `TYPE_CHECKING` and dispatched by name, so a
+suite that never touches a date or a path never pays for either module.
+
+`enum` is typed the same way and imported lazily by the two things that cannot
+do their work without it — the flag assertions, and equivalence configured with
+`comparing_enums_by_name()`. Importing the package still does not import it.
 
 Check it yourself:
 

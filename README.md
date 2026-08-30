@@ -8,10 +8,31 @@ Fluent, strictly-typed assertions for Python tests.
 [![Checked with pyright and mypy](https://img.shields.io/badge/types-pyright%20%2B%20mypy%20strict-2a6db2)](#design-commitments)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-> **Status: pre-release.** The catalogue, exception and warning assertions, rich
-> differences, matchers and the extension API are in place, tested and
-> documented, and the pipeline that will publish them is wired. Nothing has been
-> released to PyPI yet — see [CHANGELOG.md](CHANGELOG.md).
+> **Status: 0.1.0, the first release.** The catalogue, exception and warning
+> assertions, rich differences, matchers and the extension API are in place,
+> tested and documented. Before 1.0 the API may still move; when it does, the
+> reason is in [CHANGELOG.md](CHANGELOG.md), which is generated from the commit
+> log rather than written by hand.
+
+## Install
+
+```bash
+pip install lovely-assertions
+```
+
+Or, with uv:
+
+```bash
+uv add --dev lovely-assertions
+```
+
+It has no runtime dependencies and it needs Python 3.13 or newer.
+
+```python
+from lovely_assertions import expect
+
+expect("hello").starts_with("he")
+```
 
 ## Why another assertion library
 
@@ -35,8 +56,11 @@ expect(3).is_positive()  # `starts_with` is not offered here
 pyright and mypy agree:
 
 ```python
-name: str = expect(raw).is_not_none().subject  # raw: str | None
-count: int = expect(payload).is_instance_of(int).subject  # payload: object
+raw: str | None = "ada"
+payload: object = 7
+
+name: str = expect(raw).is_not_none().subject
+count: int = expect(payload).is_instance_of(int).subject
 ```
 
 Honest limitation, stated up front: the *original variable* stays `str | None` as
@@ -50,11 +74,25 @@ pretending otherwise.
 **Failure messages that locate the problem.** The competition prints a diff; this
 prints an explanation.
 
+```python
+from lovely_assertions import soft_assertions
+
+with soft_assertions():
+    expect([3, 1, 2], name="order_totals").is_sorted()
+    expect({"host": "x"}, name="server_config").contains_key("hostname")
+    expect({"port": 8080}, name="config").contains_entry("port", 9090)
 ```
-Expected order_totals to be sorted, but 1 at index 1 came after 3: [3, 1, 2].
-Expected server_config to contain key 'hostname' (did you mean 'host'?), but the keys were ['host'].
-Expected config to contain entry 'port': 9090, but that key held 8080.
+
+```text
+3 assertions failed:
+  (1) Expected order_totals to be sorted, but 1 at index 1 came after 3: [3, 1, 2].
+  (2) Expected server_config to contain key 'hostname' (did you mean 'host'?), but the keys were ['host'].
+  (3) Expected config to contain entry 'port': 9090, but that key held 8080.
 ```
+
+(One scope, three failures, one report — that is
+[soft assertions](docs/guides/soft-assertions.md), and it is why you see all
+three instead of only the first.)
 
 That last pair is the point: *the key holds a different value* and *the key is
 missing* are different bugs, and the message says which instead of leaving you to
@@ -68,6 +106,13 @@ is four hundred characters, not sixty thousand.
 **Exceptions, in the form you already reach for.**
 
 ```python
+from lovely_assertions import expect_raises
+
+
+def parse(text: str) -> int:
+    return int(text)
+
+
 with expect_raises(ValueError) as caught:
     parse("nope")
 caught.with_message_containing("invalid literal")

@@ -88,9 +88,22 @@ class Block:
         return self.language == "python" and self.skip_reason is None
 
 
+#: Hand-written pages that live outside ``docs/``. The README is the most-read
+#: page in the repository and it is also the PyPI landing page, since
+#: ``readme = "README.md"`` in ``pyproject.toml`` makes it the wheel's long
+#: description. It was the one page nothing executed, and it drifted -- so it
+#: runs under the same harness as every guide: its snippets execute, its quoted
+#: messages are compared against what the library actually produces, and its
+#: relative links are resolved.
+ROOT_PAGES: Final = ("README.md",)
+
+
 def pages() -> list[Path]:
     """Every hand-written page, in a stable order."""
-    return sorted(path for path in DOCS.rglob("*.md") if path != GENERATED)
+    return sorted(
+        [path for path in DOCS.rglob("*.md") if path != GENERATED]
+        + [REPO_ROOT / name for name in ROOT_PAGES]
+    )
 
 
 def blocks_of(page: Path) -> list[Block]:
@@ -451,7 +464,7 @@ def _module_name(page: Path) -> str:
     separator survives into a filename -- which then names a subdirectory that was
     never created.
     """
-    relative = page.relative_to(DOCS)
+    relative = page.relative_to(REPO_ROOT)
     return "__".join(relative.with_suffix("").parts).replace("-", "_") + ".py"
 
 

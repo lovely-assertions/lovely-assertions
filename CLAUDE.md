@@ -93,6 +93,11 @@ Everything runs through `uv`, with the interpreter pinned explicitly.
   performance invariants read a measurement that cannot be taken while
   `sys.settrace` is active and skip themselves. CI runs both.
 - `uv run python -m benchmarks` — timings, printed for a human, never asserted.
+- `uv sync --group fuzz --python 3.13 && uv run python -m fuzz.fuzz_hostile
+  -max_total_time=60` — one fuzzing target, Linux x86_64 only. Atheris ships no
+  other wheels, which is why the group is opt-in and why everything that decides
+  anything lives in `fuzz/properties.py`: `tests/test_fuzzing.py` runs the same
+  properties over a seeded corpus on every platform, in the ordinary suite.
 - `uv run python scripts/generate_reference.py` — regenerates
   `docs/reference/assertions.md` from the source. Run it after touching any
   assertion signature or docstring first line; a test fails if the checked-in
@@ -128,6 +133,10 @@ Everything runs through `uv`, with the interpreter pinned explicitly.
   the early returns in `_names` and the message-form classifier in
   `tests/test_happy_path.py` are tables, one branch per case. Ruff's `PLR0911`
   is turned off for exactly those three files, with the reason inline.
+- **A fuzzing property belongs in `fuzz/properties.py`, never in a driver.** The
+  drivers are thin on purpose: Atheris runs on Linux x86_64 alone, so a property
+  written inside one is a property nobody else can run. Adding a property means
+  adding it to a driver too — `tests/test_fuzzing.py` fails when one is orphaned.
 - **`benchmarks/` measures, `tests/test_performance_invariants.py` asserts.**
   Anything wall-clock-dependent belongs in the first; only claims that hold on
   any machine — no allocation on a passing assertion, a bounded import — belong

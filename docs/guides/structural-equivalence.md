@@ -114,10 +114,15 @@ print("ignored the generated fields")
 ignored the generated fields
 ```
 
-By default the expectation is a **subset**: members the subject has and the
-expectation does not mention are ignored, and members the expectation names and
-the subject lacks are reported. The two options below move each of those
-independently.
+By default the expectation is a **subset** *of a record*: fields the subject has
+and the expectation does not mention are ignored, and fields the expectation
+names and the subject lacks are reported. The two options below move each of
+those independently.
+
+A **mapping is decided the other way, and neither option touches it**: both
+directions are always reported, so an unexpected key fails. A record is a shape
+you declared and a mapping is data you were handed, and a stray key in the second
+is the more likely bug.
 
 | Method | Effect |
 |---|---|
@@ -241,10 +246,14 @@ passes.
 The practical consequence: a type with a deliberately lenient `__eq__` passes
 `is_equivalent_to` for the same reason it passes `is_equal_to`.
 
-The one exception is a comparator you supply yourself. `using(kind, comparator)`
-is consulted only for pairs equality has *not* already settled, so a comparator
-narrower than `==` can still refuse a pair — every other option here widens what
-counts as equivalent, and cannot.
+Two options escape that, because they are asked **before** `==` rather than after
+it. `using(kind, comparator)` replaces equality for the types you register, so a
+comparator narrower than `==` refuses a pair that Python would call equal. So
+does `comparing_enums_by_name()`: two `IntEnum` members sharing a value under
+different names are equal to Python and are *not* equivalent here.
+
+Every other option only widens what counts as equivalent. These two replace it,
+which is why they can be stricter.
 
 ### It never raises because of a value
 
