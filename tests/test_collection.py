@@ -41,6 +41,7 @@ from typing import Any, Final, cast
 import pytest
 from benchmarks import blocks_allocated
 
+from _happy_calls import declared_by_the_subject
 from lovely_assertions import (
     AssertionFailure,
     Found,
@@ -48,12 +49,12 @@ from lovely_assertions import (
     expect,
     soft_assertions,
 )
-from lovely_assertions._collection import (
+from lovely_assertions._collection import CollectionExpect
+from lovely_assertions._collection._hashing import (
     _HASHING_PAYS_FROM,  # pyright: ignore[reportPrivateUsage]
     _LONGEST_CONTAINER_PER_LOOKUP,  # pyright: ignore[reportPrivateUsage]
     _REPEATED_LOOKUPS_FROM,  # pyright: ignore[reportPrivateUsage]
-    CollectionExpect,
-    _searchable,  # pyright: ignore[reportPrivateUsage]
+    searchable,
 )
 from lovely_assertions._formatting import formatting
 from lovely_assertions._occurrence import (
@@ -1602,14 +1603,19 @@ NOT_ASSERTIONS: Final = frozenset({"extracting"})
 def test_the_because_table_has_not_fallen_behind_the_catalogue() -> None:
     """A new assertion must arrive with its `because` case, or this fails.
 
-    `vars()` rather than `dir()` on purpose -- the inherited half of the surface
-    belongs to `Expect` and is covered by its own tests, and the order-dependent
-    half belongs to `SequenceExpect` and to `tests/test_sequence.py`.
+    What this subject declares rather than everything it answers to -- the
+    inherited half of the surface belongs to `Expect` and is covered by its own
+    tests, and the order-dependent half belongs to `SequenceExpect` and to
+    `tests/test_sequence.py`.
+
+    Its own seams count as its own. A subject is assembled from one mixin per
+    seam, so `vars()` on it holds nothing at all, and asking that way would have
+    compared the table against an empty set and passed.
     """
     covered = {parameters.id for parameters in BECAUSE_CALLS}
     declared = {
         name
-        for name, attribute in vars(CollectionExpect).items()
+        for name, attribute in declared_by_the_subject(CollectionExpect).items()
         if not name.startswith("_") and callable(attribute)
     } - NOT_ASSERTIONS
     assert covered == declared
@@ -1617,7 +1623,7 @@ def test_the_because_table_has_not_fallen_behind_the_catalogue() -> None:
 
 def test_everything_excused_from_the_because_table_really_is_declared() -> None:
     """The excuse list cannot outlive what it excuses, or it starts hiding regressions."""
-    assert set(vars(CollectionExpect)) >= NOT_ASSERTIONS
+    assert set(declared_by_the_subject(CollectionExpect)) >= NOT_ASSERTIONS
 
 
 # ---------------------------------------------------------------------------
@@ -1854,7 +1860,7 @@ class Anything:
 class Shout(str):
     """A ``str`` subclass whose equality ignores case while its hash does not.
 
-    Which is why :data:`~lovely_assertions._collection._HASH_SAFE` names types
+    Which is why :data:`~lovely_assertions._collection._hashing._HASH_SAFE` names types
     *exactly* rather than through ``isinstance``: a subclass may override either
     half of the pair, and this one overrides the half that a set does not consult.
     ``Shout("A")`` is in ``["a"]`` and is not in ``{"a"}``.
@@ -1927,20 +1933,20 @@ def test_the_hash_table_answers_exactly_what_the_scan_answers(
     padded_other = [*other, *FILLER]
     assert _is_subset(subject, other) is verdict
     assert _is_subset(padded_subject, padded_other) is verdict
-    assert isinstance(_searchable(padded_subject, padded_other), set) is hashed
+    assert isinstance(searchable(padded_subject, padded_other), set) is hashed
 
 
 def test_a_long_enough_container_with_enough_lookups_is_hashed() -> None:
     """Otherwise every test above is a test of the scan twice over."""
     container = list(range(_HASHING_PAYS_FROM))
     lookups = list(range(_REPEATED_LOOKUPS_FROM))
-    assert isinstance(_searchable(lookups, container), set)
+    assert isinstance(searchable(lookups, container), set)
 
 
 def test_a_short_container_is_left_alone() -> None:
     container = list(range(_HASHING_PAYS_FROM - 1))
     lookups = list(range(_REPEATED_LOOKUPS_FROM))
-    assert _searchable(lookups, container) is container
+    assert searchable(lookups, container) is container
 
 
 def test_too_few_lookups_never_pay_for_a_table() -> None:
@@ -1952,7 +1958,7 @@ def test_too_few_lookups_never_pay_for_a_table() -> None:
     """
     container = list(range(100_000))
     lookups = list(range(_REPEATED_LOOKUPS_FROM - 1))
-    assert _searchable(lookups, container) is container
+    assert searchable(lookups, container) is container
 
 
 def test_enough_lookups_is_not_enough_when_the_container_dwarfs_them() -> None:
@@ -1969,8 +1975,8 @@ def test_enough_lookups_is_not_enough_when_the_container_dwarfs_them() -> None:
     just_wide_enough = list(range(_REPEATED_LOOKUPS_FROM * _LONGEST_CONTAINER_PER_LOOKUP))
     one_item_too_wide = [*just_wide_enough, -1]
 
-    assert isinstance(_searchable(lookups, just_wide_enough), set)
-    assert _searchable(lookups, one_item_too_wide) is one_item_too_wide
+    assert isinstance(searchable(lookups, just_wide_enough), set)
+    assert searchable(lookups, one_item_too_wide) is one_item_too_wide
 
 
 #: A hundred and sixty times the ~1.2us the scan actually needs, and eighteen
@@ -1991,7 +1997,7 @@ def test_needles_at_the_front_are_not_paid_for_by_hashing_everything_behind_them
     container = list(range(100_000))
     at_the_front = list(range(_REPEATED_LOOKUPS_FROM))
 
-    assert _searchable(at_the_front, container) is container
+    assert searchable(at_the_front, container) is container
 
     started = time.perf_counter()
     Bag(at_the_front).is_subset_of(container)
@@ -2009,14 +2015,14 @@ def test_a_set_is_never_hashed_a_second_time() -> None:
     """It already answers in constant time; hashing it again is pure loss."""
     container = set(range(_HASHING_PAYS_FROM * 2))
     lookups = list(range(_REPEATED_LOOKUPS_FROM))
-    assert _searchable(lookups, container) is container
+    assert searchable(lookups, container) is container
 
 
 def test_a_tuple_is_hashed_the_way_a_list_is() -> None:
     """``contains_all(*items)`` hands its operands over as a tuple."""
     container = tuple(range(_HASHING_PAYS_FROM))
     lookups = list(range(_REPEATED_LOOKUPS_FROM))
-    assert isinstance(_searchable(lookups, container), set)
+    assert isinstance(searchable(lookups, container), set)
 
 
 def test_the_values_view_is_hashed_and_the_other_two_views_are_not() -> None:
@@ -2030,10 +2036,10 @@ def test_the_values_view_is_hashed_and_the_other_two_views_are_not() -> None:
     """
     mapping = {index: index for index in range(_HASHING_PAYS_FROM)}
     lookups = list(range(_REPEATED_LOOKUPS_FROM))
-    assert isinstance(_searchable(lookups, mapping.values()), set)
-    assert _searchable(lookups, mapping.keys()) is not None
-    assert not isinstance(_searchable(lookups, mapping.keys()), set)
-    assert not isinstance(_searchable(lookups, mapping.items()), set)
+    assert isinstance(searchable(lookups, mapping.values()), set)
+    assert searchable(lookups, mapping.keys()) is not None
+    assert not isinstance(searchable(lookups, mapping.keys()), set)
+    assert not isinstance(searchable(lookups, mapping.items()), set)
     Bag(mapping.values()).is_superset_of(lookups)
 
 
@@ -2049,7 +2055,7 @@ def test_a_nan_is_found_where_it_actually_is_however_long_the_collection() -> No
     """
     holder = [*FILLER, THE_NAN]
     lookups = [*FILLER, THE_NAN]
-    assert isinstance(_searchable(lookups, holder), set)
+    assert isinstance(searchable(lookups, holder), set)
     Bag(lookups).is_subset_of(holder)
     Bag(holder).contains(THE_NAN)
     with pytest.raises(AssertionFailure):
@@ -2065,7 +2071,7 @@ def test_a_row_hashed_by_identity_is_still_found_by_value() -> None:
     """
     holder: list[object] = [*FILLER, Ledger(1)]
     lookups: list[object] = [*FILLER, Ledger(1)]
-    assert _searchable(lookups, holder) is holder
+    assert searchable(lookups, holder) is holder
     Bag(lookups).is_subset_of(holder)
     Bag(holder).contains(Ledger(1))
 
@@ -2078,7 +2084,7 @@ def test_an_unhashable_needle_is_answered_rather_than_raised() -> None:
     """
     holder: list[object] = [*FILLER, "a"]
     lookups: list[object] = [*FILLER, [9]]
-    assert _searchable(lookups, holder) is holder
+    assert searchable(lookups, holder) is holder
     with pytest.raises(AssertionFailure):
         Bag(lookups).is_subset_of(holder)
     Bag(holder).does_not_contain([9])
