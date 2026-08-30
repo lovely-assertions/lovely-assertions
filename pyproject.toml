@@ -147,7 +147,7 @@ ignore = [
     "T201",   # a generator that cannot print is not a generator
     "S603",   # same shape: `sys.executable`, a fixed argv, no caller input anywhere near it
 ]
-"src/lovely_assertions/_names.py" = [
+"src/lovely_assertions/_names/_expressions.py" = [
     # Recovering a name is a sequence of ways to give up. Each early return is a
     # distinct reason the answer would be a guess, and folding them together
     # would hide which one applied.
