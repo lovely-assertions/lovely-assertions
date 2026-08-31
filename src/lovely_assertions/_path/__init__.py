@@ -34,7 +34,7 @@ nothing, which is the failure mode this whole library is pointed at. So
 ``is_not_file``, ``is_not_directory``, ``is_not_symlink``, ``is_not_empty`` and
 ``does_not_have_child`` all fail when nothing is there, and say so. **They are
 therefore not the strict complements of their positive forms**, unlike the
-negations in ``_ordered.py``: a missing path fails ``is_file`` *and*
+negations in ``_ordered``: a missing path fails ``is_file`` *and*
 ``is_not_file``. That is stated on every one of them rather than left for a
 reader to discover, and :meth:`PathExpect.does_not_exist` is the assertion that
 means "nothing is there".

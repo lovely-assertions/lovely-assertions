@@ -36,7 +36,7 @@ class Sortable(Protocol):
     compare one member of that union against the other.
 
     ``<`` alone, and it stays that way: unlike
-    :class:`lovely_assertions._ordered.Sortable`, which names all four operators
+    :class:`lovely_assertions._ordered.Ordered`, which names all four operators
     because ``is_greater_than_or_equal_to`` is literally spelled ``>=``, nothing
     here needs more than the one operator ``sorted()`` itself needs.
     :func:`first_out_of_order` asks its inclusive question out of ``<`` and

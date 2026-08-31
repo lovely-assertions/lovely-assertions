@@ -329,7 +329,7 @@ def test_this_modules_frames_fold_out_of_an_assertion_traceback() -> None:
     """A failing assertion shows the reader's own line, not this module's frames.
 
     pytest reads ``__tracebackhide__`` from a frame's globals, so one
-    module-level assignment folds every frame of ``_ordered.py`` out of a failing
+    module-level assignment folds every frame of ``_ordered`` out of a failing
     test's traceback and the reader gets the message rather than a source listing
     of the reporting primitive. It has to be the callable and not ``True``: a
     ``TypeError`` raised inside here -- ``is_positive`` on a value that is not a
