@@ -22,6 +22,7 @@ would nest a heading inside a changelog list item.
 
 ## Checklist
 
+- [ ] I accept the [terms a contribution arrives under](../blob/main/CONTRIBUTING.md#the-terms-your-contribution-arrives-under)
 - [ ] The title above is a Conventional Commit and reads as the changelog entry it will become
 - [ ] `uv run ruff format . && uv run ruff check .`
 - [ ] `uv run pyright && uv run mypy` — both strict, both clean
