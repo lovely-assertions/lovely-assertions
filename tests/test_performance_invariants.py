@@ -74,7 +74,7 @@ import warnings
 from collections.abc import Awaitable
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from functools import partial
+from functools import cache, partial
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Final, NamedTuple
 from unittest.mock import Mock
@@ -98,10 +98,37 @@ if TYPE_CHECKING:
 
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 
-#: An order of magnitude above what the library actually costs. This is not a
-#: budget to optimise against -- it is the line past which something is wrong that
-#: no amount of tuning explains.
-_IMPORT_BUDGET_MS: Final = 60.0
+#: What ``import lovely_assertions`` alone may add, in Python startups. The
+#: package binds no subject, engine or formatter eagerly, so this is a module
+#: body and a dictionary -- a quarter of a startup, measured, and the bound is
+#: three times that.
+_BARE_IMPORT_BUDGET: Final = 0.75
+
+#: What a session asserting about the four commonest shapes may add, in Python
+#: startups. Around one and a half, measured; the bound is a shade over twice
+#: that, which leaves room for a slow runner while still failing on the weight of
+#: a dozen stdlib modules.
+_SESSION_BUDGET: Final = 3.5
+
+#: ``self | cumulative | name``, which is what ``-X importtime`` prints.
+_IMPORTTIME_COLUMNS: Final = 3
+
+#: The modules of a subject family that dispatch is allowed to load before it
+#: knows what it is looking at. ``expect_raises`` and ``expect_warns`` are public
+#: exports the dispatcher re-exports, and recognising a mock is what decides
+#: whether a value gets the mock subject at all -- none of the three can wait
+#: until after the answer. Everything else in those families can, and must.
+_DISPATCH_NEEDS: Final = frozenset(
+    {
+        "lovely_assertions._callable",
+        "lovely_assertions._mock",
+        "lovely_assertions._mock._recognition",
+        "lovely_assertions._warnings",
+    }
+)
+
+#: Pinned, so a family cannot join the table without a reader noticing.
+_DISPATCH_NEEDS_COUNT: Final = 4
 
 
 def _nothing() -> None:
@@ -1396,44 +1423,178 @@ def test_the_measurements_leave_the_interpreter_as_they_found_it() -> None:
 # ---------------------------------------------------------------------------
 # Import cost
 # ---------------------------------------------------------------------------
-def test_importing_the_library_is_cheap() -> None:
-    """A generous bound, so it catches a real regression and never flakes.
+def _loaded_ms(code: str, /) -> float:
+    """Milliseconds of module loading that running ``code`` is responsible for.
 
-    The *smallest* reading rather than the middle one, for the reason
-    :data:`conftest.measured` gives about the retention probes: a busy machine can
-    only make an import look slower, never faster, so the smallest is the least
-    contaminated estimate of what the import costs. The distribution has a long
-    right tail -- one sample in nine runs three times the floor with nothing else
-    on the machine -- and a median over five is not enough to stay out of it.
+    Every row of ``-X importtime`` summed, less the same total for an empty
+    program, rather than the rows belonging to this package. Those two are not
+    the same measurement, and the difference is the whole point: ``importtime``
+    reports each module's *own* body, so a heavy import pulled in by a subject is
+    charged to ``tarfile`` and to ``xml.dom.minidom``, never to the package that
+    asked for them. Summing our own rows measures the module bodies we wrote and
+    is blind to everything we drag in behind us -- which is the half that costs.
 
-    Nothing is weakened by that, and it was measured rather than assumed: five
-    heavy modules added at the top of the package move the floor by thirty
-    milliseconds and the median by thirty-two. Weight raises the floor; only luck
-    raises the tail, and no amount of luck lowers a floor.
+    The smallest of several readings, for the reason :data:`conftest.measured`
+    gives: a busy machine can only make a load look slower.
     """
-    timings: list[float] = []
+    readings: list[float] = []
     for _ in range(7):
-        result = subprocess.run(
-            [sys.executable, "-X", "importtime", "-c", "import lovely_assertions"],
+        # The callers below pass a literal written a few lines away; nothing here
+        # reaches an argument this suite did not spell out itself.
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, "-X", "importtime", "-c", code],
             capture_output=True,
             text=True,
             check=True,
             cwd=REPO_ROOT,
         )
-        rows = [
-            line
+        spent = sum(
+            int(columns[0].split(":")[1])
             for line in result.stderr.splitlines()
-            if line.rstrip().endswith("lovely_assertions")
-        ]
-        if rows:
-            timings.append(int(rows[-1].split("|")[1].strip()) / 1000)
-    assert timings, "could not read an import time from -X importtime"
-    floor = min(timings)
-    assert floor < _IMPORT_BUDGET_MS, (
-        f"importing lovely_assertions took {floor:.1f}ms at best, past the "
-        f"{_IMPORT_BUDGET_MS}ms bound. Something heavy is being imported at module level, "
-        f"or a dependency crept in. Every reading: "
-        + ", ".join(f"{timing:.1f}" for timing in sorted(timings))
+            if len(columns := line.split("|")) == _IMPORTTIME_COLUMNS
+            and not line.startswith("import time: self")
+        )
+        readings.append(spent / 1000)
+    return min(readings)
+
+
+def _package_modules_after(code: str, /) -> frozenset[str]:
+    """Every module of this package that running ``code`` leaves in ``sys.modules``.
+
+    A fresh interpreter each time, because the answer is the whole point and this
+    suite has already imported most of the library by the time it runs.
+    """
+    # A literal written a few lines away; nothing here reaches an argument this
+    # suite did not spell out itself.
+    result = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-c",
+            (
+                f"{code}\nimport sys\n"
+                "print('\\n'.join(m for m in sys.modules if m.startswith('lovely_assertions')))"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=REPO_ROOT,
+    )
+    loaded = frozenset(result.stdout.split())
+    assert loaded, (
+        "read no loaded module at all from the subprocess, so a caller comparing "
+        "against this set would be comparing against nothing and passing for it"
+    )
+    return loaded
+
+
+def _added_startups(code: str, /) -> float:
+    """What ``code`` loads, counted in Python startups rather than milliseconds.
+
+    A ratio, because the repository's rule is that a performance claim is a test
+    only when it holds on any machine, and milliseconds do not: the Windows
+    runner pays several times what a developer's laptop does for the same import,
+    so a millisecond bound loose enough to be safe there is too loose to fail
+    anywhere. Dividing by what an empty program costs on the same machine cancels
+    that out, and turns the claim into one a reader can hold in their head --
+    *loading this library costs about one and a half Python startups*.
+    """
+    return (_loaded_ms(code) - _interpreter_floor()) / _interpreter_floor()
+
+
+@cache
+def _interpreter_floor() -> float:
+    """What an empty program already costs on this machine.
+
+    Cached, because both tests below need it and each reading is seven
+    subprocesses. Caching it also pins the two tests to the same denominator, so
+    their two numbers stay comparable to each other.
+    """
+    return _loaded_ms("pass")
+
+
+def test_importing_the_library_is_nearly_free() -> None:
+    """The package itself loads almost nothing until something is asserted.
+
+    What a program pays for ``import lovely_assertions`` alone: a module that
+    binds no subject, no engine and no formatter, and answers for each of them on
+    the first attribute access that needs it.
+
+    This is the half of the claim that is easy to satisfy and easy to satisfy
+    dishonestly, which is why the test below exists beside it.
+    """
+    cost = _added_startups("import lovely_assertions")
+
+    assert cost < _BARE_IMPORT_BUDGET, (
+        f"importing lovely_assertions cost {cost:.2f} Python startups at best, past the "
+        f"{_BARE_IMPORT_BUDGET} bound. Something is being imported eagerly again."
+    )
+
+
+def test_dispatch_loads_a_family_recognition_and_not_its_subject() -> None:
+    """Asserting about an integer loads no mock, no warning and no call subject.
+
+    The claim the timing tests underneath cannot make. Twenty-five small modules
+    of our own weigh almost nothing next to a Python startup, so a family whose
+    package quietly began loading itself in full on every assertion passes a
+    generous millisecond bound comfortably -- and this suite would have called
+    that laziness while the library imported ten mock modules to compare two
+    integers.
+
+    So this one is about identity rather than cost: it names what dispatch is
+    allowed to reach for before it knows what kind of value it has, and rejects
+    everything else. Being a set comparison and not a measurement, it is exactly
+    as true on a loaded CI runner as on an idle laptop, and it survives the
+    families being split further -- what it pins is the boundary, not the
+    file count on either side of it.
+    """
+    assert len(_DISPATCH_NEEDS) == _DISPATCH_NEEDS_COUNT
+
+    loaded = _package_modules_after("import lovely_assertions as la; la.expect(1).is_equal_to(1)")
+
+    families = {"_callable", "_mock", "_warnings", "_path", "_datetime", "_enum"}
+    reached = {
+        module
+        for module in loaded
+        if module.removeprefix("lovely_assertions.").split(".")[0] in families
+        and module not in _DISPATCH_NEEDS
+    }
+    assert not reached, (
+        "comparing two integers loaded these, which belong to other kinds of value:\n"
+        + "\n".join(f"  {module}" for module in sorted(reached))
+        + "\nA family's package should expose its subject through a module `__getattr__`, "
+        "so that reaching for what dispatch needs does not import what it does not."
+    )
+
+
+def test_a_session_pays_only_for_the_subjects_it_uses() -> None:
+    """What a real test session costs, which is the figure that cannot be gamed.
+
+    Four assertions over the four commonest shapes. This is what the bare-import
+    number above cannot be traded against: the package loads a subject on first
+    use, so making the import lazier moves work here rather than removing it, and
+    a change that only moved it reads as no change at all.
+
+    A deliberately generous bound, several times what this costs, and worth being
+    plain about what that buys: this test catches a catastrophe, not a
+    grams. One heavy module added to a subject passes comfortably; a dozen do
+    not. The instrument that catches the single one is
+    :func:`test_no_module_level_import_of_failure_path_modules`, which names the
+    modules that must not be imported and does not care how fast they are. This
+    one is the backstop underneath it, for the weight nobody thought to name.
+    """
+    cost = _added_startups(
+        "import lovely_assertions as la; "
+        "la.expect(1).is_equal_to(1); "
+        'la.expect("s").is_not_empty(); '
+        "la.expect([1]).is_not_empty(); "
+        "la.expect({}).is_empty()"
+    )
+
+    assert cost < _SESSION_BUDGET, (
+        f"four assertions cost {cost:.2f} Python startups at best, past the "
+        f"{_SESSION_BUDGET} bound. Something heavy is being imported, or a subject "
+        f"is pulling in more of the library than it needs."
     )
 
 

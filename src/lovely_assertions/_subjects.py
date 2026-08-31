@@ -17,34 +17,12 @@ import sys
 from abc import get_cache_token
 from collections.abc import Callable, Collection, Mapping, Sequence
 from types import BuiltinFunctionType, FunctionType, MethodType
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any, cast, overload
 
-from lovely_assertions._bool import BoolExpect
-from lovely_assertions._callable import CallableExpect, RaisedExpect, expect_raises
-from lovely_assertions._collection import CollectionExpect
+from lovely_assertions._callable import expect_raises
 from lovely_assertions._core import Expect
-from lovely_assertions._datetime import (
-    DateExpect,
-    DateTimeExpect,
-    TimeDeltaExpect,
-    TimeExpect,
-    WithinDelta,
-)
-from lovely_assertions._enum import EnumExpect
 from lovely_assertions._exceptions import hide_internal_frames
-from lovely_assertions._mapping import MappingExpect
-from lovely_assertions._mock import (
-    FIRST_MOCK_MARKER,
-    MockExpect,
-    answers_the_protocol,
-    is_mock,
-)
-from lovely_assertions._numeric import NumericExpect
-from lovely_assertions._ordered import OrderedExpect
-from lovely_assertions._path import PathExpect, PurePathExpect
-from lovely_assertions._sequence import SequenceExpect
-from lovely_assertions._string import StringExpect
-from lovely_assertions._type import TypeExpect
+from lovely_assertions._mock import FIRST_MOCK_MARKER, answers_the_protocol, is_mock
 
 if TYPE_CHECKING:
     from datetime import date, datetime, time, timedelta
@@ -53,32 +31,101 @@ if TYPE_CHECKING:
     from fractions import Fraction
     from pathlib import Path, PurePath
 
+    from lovely_assertions._bool import BoolExpect
+    from lovely_assertions._callable import CallableExpect
+    from lovely_assertions._collection import CollectionExpect
+    from lovely_assertions._datetime import (
+        DateExpect,
+        DateTimeExpect,
+        TimeDeltaExpect,
+        TimeExpect,
+    )
+    from lovely_assertions._enum import EnumExpect
+    from lovely_assertions._mapping import MappingExpect
+    from lovely_assertions._numeric import NumericExpect
+    from lovely_assertions._ordered import OrderedExpect
+    from lovely_assertions._path import PathExpect, PurePathExpect
+    from lovely_assertions._sequence import SequenceExpect
+    from lovely_assertions._string import StringExpect
+    from lovely_assertions._type import TypeExpect
+
 #: pytest reads ``__tracebackhide__`` from a frame's globals, so this one
 #: assignment folds every frame of this module out of an assertion failure's
 #: traceback while leaving them in place for a genuine error. See
 #: :func:`lovely_assertions._exceptions.hide_internal_frames`.
 __tracebackhide__ = hide_internal_frames
 
+
+#: Which subject each stand-in stands for. A table rather than an attribute on
+#: the function, so nothing here needs a type-checker suppression to say what it
+#: already knows.
+_STANDS_FOR: "dict[Callable[[Any], Expect[Any]], tuple[str, str]]" = {}
+
+
+def _subject_class(module: str, name: str, /) -> "type[Expect[Any]]":
+    """One subject class, imported the first time a value needs it."""
+    from importlib import import_module  # noqa: PLC0415  (kept off import time)
+
+    return cast("type[Expect[Any]]", getattr(import_module("lovely_assertions." + module), name))
+
+
+def _resolving(
+    table: "dict[Any, Any]",
+    key: Any,  # noqa: ANN401  (a table row, keyed by whatever the table is)
+    module: str,
+    name: str,
+    /,
+) -> "Callable[[Any], Expect[Any]]":
+    """A table entry that becomes the subject class the first time it is used.
+
+    The dispatch is the hottest path in the library, so laziness here has to cost
+    nothing once it has been paid for. It does not: the entry replaces itself with
+    the class, and every call after the first takes the same route it always did.
+    """
+
+    def resolve(value: Any) -> Any:  # noqa: ANN401  (any subject)
+        subject = _subject_class(module, name)
+        table[key] = subject
+        return subject(value)
+
+    # The name is what a refusal message reads back to the caller: `register()`
+    # tells them which subject already claims a type, and "build" would tell them
+    # nothing. A stand-in that answers to the name it stands in for is the whole
+    # point of it being a stand-in.
+    resolve.__name__ = resolve.__qualname__ = name
+    _STANDS_FOR[resolve] = (module, name)
+    return resolve
+
+
+def _named(module: str, name: str, /) -> "Callable[[Any], Expect[Any]]":
+    """A subject named rather than imported, resolved on the first value it gets.
+
+    Used by the tables whose value types live in modules this one refuses to
+    import. Those are reached only after every exact entry has missed, so the
+    lookup they pay is the one they already paid.
+    """
+
+    def build(value: Any) -> Any:  # noqa: ANN401  (any subject)
+        return _subject_class(module, name)(value)
+
+    build.__name__ = build.__qualname__ = name
+    _STANDS_FOR[build] = (module, name)
+    return build
+
+
+#: The callable subject, named rather than imported: a program that never asserts
+#: about a call never loads the family that does.
+_CALLABLE: "Callable[[Any], Expect[Any]]" = _named("_callable", "CallableExpect")
+
+#: The mock subject, named for the same reason: a session with no mocks in it
+#: never loads the family that recognises one.
+_MOCK: "Callable[[Any], Expect[Any]]" = _named("_mock", "MockExpect")
+
+#: What this module defines. The subject classes used to be re-exported here so
+#: the package could import them from one place; the package reaches each one in
+#: the module that defines it now, which is what lets a program load only the
+#: subjects it actually holds.
 __all__ = [
-    "BoolExpect",
-    "CallableExpect",
-    "CollectionExpect",
-    "DateExpect",
-    "DateTimeExpect",
-    "EnumExpect",
-    "MappingExpect",
-    "MockExpect",
-    "NumericExpect",
-    "OrderedExpect",
-    "PathExpect",
-    "PurePathExpect",
-    "RaisedExpect",
-    "SequenceExpect",
-    "StringExpect",
-    "TimeDeltaExpect",
-    "TimeExpect",
-    "TypeExpect",
-    "WithinDelta",
     "expect",
     "expect_raises",
     "is_mock",
@@ -98,7 +145,7 @@ def expect[V, X: Expect[Any]](value: V, /, *, as_: "Callable[[V], X]", name: str
 # `Collection` leaves the two halves disagreeing -- a checker answering
 # `CollectionExpect` for `expect(Colour)` while the runtime builds a `TypeExpect`.
 @overload
-def expect(value: type[Any], /, *, name: str = ...) -> TypeExpect: ...
+def expect(value: type[Any], /, *, name: str = ...) -> "TypeExpect": ...
 # Then the subjects whose value types live in modules the library refuses to
 # import. They come first among the inferred overloads because one of them has to:
 # an `IntEnum` member is an `int` and a `StrEnum` member is a `str`, so anything
@@ -108,15 +155,15 @@ def expect(value: type[Any], /, *, name: str = ...) -> TypeExpect: ...
 @overload
 def expect[E: "Enum"](value: E, /, *, name: str = ...) -> "EnumExpect[E]": ...
 @overload
-def expect(value: "datetime", /, *, name: str = ...) -> DateTimeExpect: ...
+def expect(value: "datetime", /, *, name: str = ...) -> "DateTimeExpect": ...
 @overload
 def expect[D: "date"](value: D, /, *, name: str = ...) -> "DateExpect[D]": ...
 @overload
-def expect(value: "time", /, *, name: str = ...) -> TimeExpect: ...
+def expect(value: "time", /, *, name: str = ...) -> "TimeExpect": ...
 @overload
-def expect(value: "timedelta", /, *, name: str = ...) -> TimeDeltaExpect: ...
+def expect(value: "timedelta", /, *, name: str = ...) -> "TimeDeltaExpect": ...
 @overload
-def expect(value: "Path", /, *, name: str = ...) -> PathExpect: ...
+def expect(value: "Path", /, *, name: str = ...) -> "PathExpect": ...
 @overload
 def expect[P: "PurePath"](value: P, /, *, name: str = ...) -> "PurePathExpect[P]": ...
 # `Decimal` and `Fraction` are ordered but are not `int | float`, so without an
@@ -132,11 +179,11 @@ def expect(value: "Fraction", /, *, name: str = ...) -> "OrderedExpect[Fraction]
 # advise about is the intended behaviour, not an oversight, and the suppressions
 # below are aimed at exactly that advice and nothing else.
 @overload
-def expect(value: bool, /, *, name: str = ...) -> BoolExpect: ...  # type: ignore[overload-overlap]  # pyright: ignore[reportOverlappingOverload]
+def expect(value: bool, /, *, name: str = ...) -> "BoolExpect": ...  # type: ignore[overload-overlap]  # pyright: ignore[reportOverlappingOverload]
 @overload
-def expect(value: str, /, *, name: str = ...) -> StringExpect: ...  # type: ignore[overload-overlap]  # pyright: ignore[reportOverlappingOverload]
+def expect(value: str, /, *, name: str = ...) -> "StringExpect": ...  # type: ignore[overload-overlap]  # pyright: ignore[reportOverlappingOverload]
 @overload
-def expect(value: int | float, /, *, name: str = ...) -> NumericExpect: ...
+def expect(value: int | float, /, *, name: str = ...) -> "NumericExpect": ...
 # `Mapping` deliberately shadows `Collection[E]` below, the way `str` shadows
 # `Sequence[E]`: a mapping is a collection of its keys, and its own subject is
 # the richer one. Same first-match-wins contract, same deliberate overlap, same
@@ -147,14 +194,14 @@ def expect(value: int | float, /, *, name: str = ...) -> NumericExpect: ...
 # class can inherit both it and a built-in, and `_resolve_shape` asks the same
 # questions in this same order so that such a class gets one answer, not two.
 @overload
-def expect[K, V](value: Mapping[K, V], /, *, name: str = ...) -> MappingExpect[K, V]: ...  # type: ignore[overload-overlap]
+def expect[K, V](value: Mapping[K, V], /, *, name: str = ...) -> "MappingExpect[K, V]": ...  # type: ignore[overload-overlap]
 @overload
-def expect[E](value: Sequence[E], /, *, name: str = ...) -> SequenceExpect[E]: ...
+def expect[E](value: Sequence[E], /, *, name: str = ...) -> "SequenceExpect[E]": ...
 # Everything left that has a length, an iterator and a membership test: sets,
 # frozensets and the three dict views. After `Sequence` and `Mapping`, because
 # each of those is a collection with more to offer.
 @overload
-def expect[E](value: Collection[E], /, *, name: str = ...) -> CollectionExpect[E]: ...
+def expect[E](value: Collection[E], /, *, name: str = ...) -> "CollectionExpect[E]": ...
 # A class is callable and has far more to say about itself than that, so it sits
 # above the callable overload, in the same first-match-wins order the runtime
 # walks.
@@ -173,7 +220,7 @@ def expect[E](value: Collection[E], /, *, name: str = ...) -> CollectionExpect[E
 # a function, a bound method, or an instance of a class defining `__call__`, and
 # the only cost is that `.subject` widens to the callable type.
 @overload
-def expect(value: "Callable[..., object]", /, *, name: str = ...) -> CallableExpect: ...
+def expect(value: "Callable[..., object]", /, *, name: str = ...) -> "CallableExpect": ...
 @overload
 def expect[T](value: T, /, *, name: str = ...) -> Expect[T]: ...
 def expect(
@@ -266,9 +313,9 @@ def _dispatch(value: object, subject_type: type[Any], /) -> Any:  # noqa: ANN401
     # exactly as it is -- it is public surface.
     if subject_type is FunctionType:
         if answers_the_protocol(value):
-            return MockExpect(value)
+            return _MOCK(value)
     elif hasattr(subject_type, FIRST_MOCK_MARKER) and answers_the_protocol(subject_type):
-        return MockExpect(value)
+        return _MOCK(value)
     factory = _REGISTERED.get(subject_type)
     if factory is None:
         factory = _claimed_by_shape(subject_type)
@@ -281,7 +328,7 @@ def _dispatch(value: object, subject_type: type[Any], /) -> Any:  # noqa: ANN401
     # the end of the chain. `claimed_by` pays that price because `register()` has
     # no value to ask -- and it runs once, at import.
     if callable(value):
-        return CallableExpect(value)
+        return _CALLABLE(value)
     return Expect(value)
 
 
@@ -314,10 +361,21 @@ def claimed_by(subject_type: type[Any], /) -> "Callable[[Any], Expect[Any]] | No
     No leading underscore because other modules in the package reach it, and a
     name that announces itself as private and is then imported across a module
     boundary is worse than the plain name.
+
+    Resolves the stand-ins the tables hold, so the answer is the subject class
+    itself. Callers compare it by identity -- ``register()`` refuses a type
+    something already claims, and says which -- and a stand-in that answered
+    those questions about itself would answer them wrongly. This runs once per
+    registration and never on the dispatch, so resolving here costs nothing that
+    a value ever pays for.
     """
-    return _claimed_by_shape(subject_type) or (
-        CallableExpect if _instances_are_callable(subject_type) else None
+    claimed = _claimed_by_shape(subject_type) or (
+        _CALLABLE if _instances_are_callable(subject_type) else None
     )
+    if claimed is None:
+        return None
+    named = _STANDS_FOR.get(claimed)
+    return _subject_class(*named) if named is not None else claimed
 
 
 #: The callable types, in a table of their own *behind* the mock check rather than
@@ -337,9 +395,9 @@ def claimed_by(subject_type: type[Any], /) -> "Callable[[Any], Expect[Any]] | No
 #: `BuiltinMethodType is BuiltinFunctionType` in CPython, so `{}.keys` and `len`
 #: are the same entry; a bound method of a Python class is `MethodType`.
 _CALLABLE_TYPES: "dict[type[Any], Callable[[Any], Expect[Any]]]" = {
-    FunctionType: CallableExpect,
-    BuiltinFunctionType: CallableExpect,
-    MethodType: CallableExpect,
+    FunctionType: _CALLABLE,
+    BuiltinFunctionType: _CALLABLE,
+    MethodType: _CALLABLE,
 }
 
 
@@ -383,7 +441,7 @@ def _resolve_shape(subject_type: type[Any], /) -> "Callable[[Any], Expect[Any]] 
     # `type[Any]` and answers `TypeExpect`. The two orders are one table seen
     # twice, so the runtime follows the overloads rather than the reverse.
     if issubclass(subject_type, type):
-        return TypeExpect
+        return _subject_class("_type", "TypeExpect")
     # Then the types from modules this one refuses to import. It has to precede
     # `str` and `int | float`: a `StrEnum` member is a `str` and an `IntEnum`
     # member is an `int`, and `_enum.py` explains why being an enum wins.
@@ -396,17 +454,17 @@ def _resolve_shape(subject_type: type[Any], /) -> "Callable[[Any], Expect[Any]] 
     # class anyone can write, and every overload above `Mapping` claims it. Only
     # this order answers what the checker promised its author.
     if issubclass(subject_type, str):
-        return StringExpect
+        return _subject_class("_string", "StringExpect")
     if issubclass(subject_type, int | float):
-        return NumericExpect
+        return _subject_class("_numeric", "NumericExpect")
     # `Mapping` in turn leads the two below it: a mapping is a collection of its
     # keys, and its own subject is the richer one.
     if issubclass(subject_type, Mapping):
-        return MappingExpect
+        return _subject_class("_mapping", "MappingExpect")
     if issubclass(subject_type, Sequence):
-        return SequenceExpect
+        return _subject_class("_sequence", "SequenceExpect")
     if issubclass(subject_type, Collection):
-        return CollectionExpect
+        return _subject_class("_collection", "CollectionExpect")
     return None
 
 
@@ -493,21 +551,29 @@ _VIEW_SOURCE: dict[Any, Any] = {}
 #: calling a subscripted generic alias goes through ``_GenericAlias.__call__``, an
 #: order of magnitude dearer than calling the class itself and more than the whole
 #: rest of the dispatch put together, on the hottest path in the library.
-_EXACT_SUBJECTS: dict[type[Any], Callable[[Any], Expect[Any]]] = {
-    bool: BoolExpect,
-    str: StringExpect,
-    int: NumericExpect,
-    float: NumericExpect,
-    dict: MappingExpect,
-    list: SequenceExpect,
-    tuple: SequenceExpect,
-    type: TypeExpect,
-    set: CollectionExpect,
-    frozenset: CollectionExpect,
-    type(_VIEW_SOURCE.keys()): CollectionExpect,
-    type(_VIEW_SOURCE.values()): CollectionExpect,
-    type(_VIEW_SOURCE.items()): CollectionExpect,
-}
+_EXACT_SUBJECTS: dict[type[Any], "Callable[[Any], Expect[Any]]"] = {}
+
+#: One row per case, exactly as the dict above was: the type, and the subject it
+#: gets. What changed is that the subject is named rather than imported, so a
+#: program that never holds a mapping never loads the mapping subject.
+_EXACT_ROWS: "tuple[tuple[type[Any], str, str], ...]" = (
+    (bool, "_bool", "BoolExpect"),
+    (str, "_string", "StringExpect"),
+    (int, "_numeric", "NumericExpect"),
+    (float, "_numeric", "NumericExpect"),
+    (dict, "_mapping", "MappingExpect"),
+    (list, "_sequence", "SequenceExpect"),
+    (tuple, "_sequence", "SequenceExpect"),
+    (type, "_type", "TypeExpect"),
+    (set, "_collection", "CollectionExpect"),
+    (frozenset, "_collection", "CollectionExpect"),
+    (type(_VIEW_SOURCE.keys()), "_collection", "CollectionExpect"),
+    (type(_VIEW_SOURCE.values()), "_collection", "CollectionExpect"),
+    (type(_VIEW_SOURCE.items()), "_collection", "CollectionExpect"),
+)
+
+for _type, _module, _name in _EXACT_ROWS:
+    _EXACT_SUBJECTS[_type] = _resolving(_EXACT_SUBJECTS, _type, _module, _name)
 
 
 #: The subjects whose value types live in modules this one refuses to import,
@@ -522,19 +588,22 @@ _EXACT_SUBJECTS: dict[type[Any], Callable[[Any], Expect[Any]]] = {
 #: same. The subject modules themselves take their types under `TYPE_CHECKING` for
 #: the same reason, so importing them eagerly here costs nothing.
 _LAZY_SUBJECTS: "tuple[tuple[str, tuple[tuple[str, Callable[[Any], Expect[Any]]], ...]], ...]" = (
-    ("enum", (("Enum", EnumExpect),)),
+    ("enum", (("Enum", _named("_enum", "EnumExpect")),)),
     (
         "datetime",
         (
-            ("datetime", DateTimeExpect),
-            ("date", DateExpect),
-            ("time", TimeExpect),
-            ("timedelta", TimeDeltaExpect),
+            ("datetime", _named("_datetime", "DateTimeExpect")),
+            ("date", _named("_datetime", "DateExpect")),
+            ("time", _named("_datetime", "TimeExpect")),
+            ("timedelta", _named("_datetime", "TimeDeltaExpect")),
         ),
     ),
-    ("pathlib", (("Path", PathExpect), ("PurePath", PurePathExpect))),
-    ("decimal", (("Decimal", OrderedExpect),)),
-    ("fractions", (("Fraction", OrderedExpect),)),
+    (
+        "pathlib",
+        (("Path", _named("_path", "PathExpect")), ("PurePath", _named("_path", "PurePathExpect"))),
+    ),
+    ("decimal", (("Decimal", _named("_ordered", "OrderedExpect")),)),
+    ("fractions", (("Fraction", _named("_ordered", "OrderedExpect")),)),
 )
 
 #: Answers already worked out for the whole shape chain, keyed by the type asked

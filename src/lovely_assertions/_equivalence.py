@@ -113,7 +113,7 @@ from abc import get_cache_token
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Final, cast, override
 
-from lovely_assertions._diff import render_operand
+from lovely_assertions import _engine
 from lovely_assertions._exceptions import hide_internal_frames
 from lovely_assertions._formatters import format_value
 from lovely_assertions._formatting import current_formatting
@@ -1995,7 +1995,7 @@ def _names_text(names: "Iterable[str]", /) -> str:
 def _render_items(items: "tuple[object, ...]", /) -> str:
     """Render a computed list of members, truncated like every other collection."""
     max_items = current_formatting().max_items
-    shown = [render_operand(item) for item in items[:max_items]]
+    shown = [_engine.render_operand(item) for item in items[:max_items]]
     elided = len(items) - max_items
     if elided > 0:
         return "[" + ", ".join(shown) + ", ... (" + str(elided) + " more)]"

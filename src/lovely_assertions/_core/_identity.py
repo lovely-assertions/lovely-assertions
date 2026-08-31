@@ -7,8 +7,8 @@ message and mean entirely different things about the bug.
 
 from typing import Self
 
+from lovely_assertions import _engine
 from lovely_assertions._core._base import ExpectBase
-from lovely_assertions._diff import render_operand
 from lovely_assertions._exceptions import hide_internal_frames
 
 #: pytest reads ``__tracebackhide__`` from a frame's globals, so this one
@@ -33,8 +33,8 @@ class IdentityAssertions[T](ExpectBase[T]):
         if self._subject is expected:
             return self
         return self._fail(
-            f"to be the same object as {render_operand(expected)},"
-            f" but was {render_operand(self._subject)}",
+            f"to be the same object as {_engine.render_operand(expected)},"
+            f" but was {_engine.render_operand(self._subject)}",
             because,
         )
 
@@ -46,4 +46,6 @@ class IdentityAssertions[T](ExpectBase[T]):
         """
         if self._subject is not unexpected:
             return self
-        return self._fail(f"not to be the same object as {render_operand(unexpected)}", because)
+        return self._fail(
+            f"not to be the same object as {_engine.render_operand(unexpected)}", because
+        )

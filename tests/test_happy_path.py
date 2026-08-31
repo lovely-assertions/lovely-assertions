@@ -319,21 +319,27 @@ def _own_nodes(node: ast.AST) -> Iterator[ast.AST]:
 def _call_target(node: ast.Call) -> tuple[str, str] | None:
     """What a call resolves to inside this library, as ``(kind, name)``.
 
-    Only two shapes can be resolved without a type checker: a bare name, and
-    ``self.something``. Everything else -- ``path.is_symlink()``,
-    ``pattern.match()`` -- is a call on somebody else's object and is left alone.
-    Resolving it by name would collide ``PathExpect.is_symlink`` with
-    ``Path.is_symlink`` and turn the whole graph to noise.
+    Three shapes can be resolved without a type checker: a bare name,
+    ``self.something``, and ``_engine.something``. Everything else --
+    ``path.is_symlink()``, ``pattern.match()`` -- is a call on somebody else's
+    object and is left alone. Resolving it by name would collide
+    ``PathExpect.is_symlink`` with ``Path.is_symlink`` and turn the whole graph
+    to noise.
+
+    ``_engine`` is resolved because it is this package's own lazy re-export of
+    the diff and equivalence engines, and every name reached through it is a
+    module-level function of one of them. Leaving it alone would cut the graph
+    at exactly the calls this rule exists to follow: a message builder named
+    through a module is still a message builder.
     """
     func = node.func
     if isinstance(func, ast.Name):
         return ("function", func.id)
-    if (
-        isinstance(func, ast.Attribute)
-        and isinstance(func.value, ast.Name)
-        and func.value.id == "self"
-    ):
-        return ("method", func.attr)
+    if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+        if func.value.id == "self":
+            return ("method", func.attr)
+        if func.value.id == "_engine":
+            return ("function", func.attr)
     return None
 
 

@@ -12,8 +12,10 @@ from lovely_assertions._exceptions import hide_internal_frames
 if TYPE_CHECKING:
     from enum import Enum
 
+    from lovely_assertions._bool import BoolExpect
     from lovely_assertions._core import Expect
-    from lovely_assertions._subjects import BoolExpect, EnumExpect, StringExpect
+    from lovely_assertions._enum import EnumExpect
+    from lovely_assertions._string import StringExpect
 from lovely_assertions._core._instance import InstanceAssertions
 
 #: pytest reads ``__tracebackhide__`` from a frame's globals, so this one

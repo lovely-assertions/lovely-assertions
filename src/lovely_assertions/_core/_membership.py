@@ -6,6 +6,7 @@ two read alike and fail differently, so both say which form they were asked in.
 
 from typing import TYPE_CHECKING, Self
 
+from lovely_assertions import _engine
 from lovely_assertions._exceptions import hide_internal_frames
 from lovely_assertions._formatters import format_value
 
@@ -17,7 +18,6 @@ from lovely_assertions._core._base import ExpectBase
 #: assignment folds every frame of this module out of an assertion failure's
 #: traceback while leaving them in place for a genuine error. See
 #: :func:`lovely_assertions._exceptions.hide_internal_frames`.
-from lovely_assertions._diff import render_operand
 
 __tracebackhide__ = hide_internal_frames
 
@@ -50,7 +50,7 @@ class MembershipAssertions[T](ExpectBase[T]):
             "to be one of ("
             + ", ".join(format_value(option) for option in options)
             + ("," if len(options) == 1 else "")
-            + f"), but was {render_operand(self._subject)}",
+            + f"), but was {_engine.render_operand(self._subject)}",
             because,
         )
 
@@ -65,7 +65,8 @@ class MembershipAssertions[T](ExpectBase[T]):
         if self._subject in container:
             return self
         return self._fail(
-            f"to be in {render_operand(container)}, but was {render_operand(self._subject)}",
+            f"to be in {_engine.render_operand(container)}, "
+            f"but was {_engine.render_operand(self._subject)}",
             because,
         )
 
@@ -77,6 +78,7 @@ class MembershipAssertions[T](ExpectBase[T]):
         if self._subject not in container:
             return self
         return self._fail(
-            f"not to be in {render_operand(container)}, but was {render_operand(self._subject)}",
+            f"not to be in {_engine.render_operand(container)}, "
+            f"but was {_engine.render_operand(self._subject)}",
             because,
         )

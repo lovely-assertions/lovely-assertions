@@ -19,8 +19,8 @@ asserting that it was ``True``.
 
 from typing import Self
 
+from lovely_assertions import _engine
 from lovely_assertions._core import Expect
-from lovely_assertions._diff import render_operand
 from lovely_assertions._exceptions import hide_internal_frames
 
 #: pytest reads ``__tracebackhide__`` from a frame's globals, so this one
@@ -54,7 +54,7 @@ class BoolExpect(Expect[bool]):
         """
         if self._subject is True:
             return self
-        return self._fail(f"to be True, but was {render_operand(self._subject)}", because)
+        return self._fail(f"to be True, but was {_engine.render_operand(self._subject)}", because)
 
     def is_false(self, *, because: str = "") -> Self:
         """Assert the subject is ``False``.
@@ -67,7 +67,7 @@ class BoolExpect(Expect[bool]):
         """
         if self._subject is False:
             return self
-        return self._fail(f"to be False, but was {render_operand(self._subject)}", because)
+        return self._fail(f"to be False, but was {_engine.render_operand(self._subject)}", because)
 
     def is_not_true(self, *, because: str = "") -> Self:
         """Assert the subject is not ``True``.
@@ -121,7 +121,7 @@ class BoolExpect(Expect[bool]):
         if not self._subject or consequent:
             return self
         return self._fail(
-            f"to imply the consequent, but was {render_operand(self._subject)} "
-            f"while the consequent was {render_operand(consequent)}",
+            f"to imply the consequent, but was {_engine.render_operand(self._subject)} "
+            f"while the consequent was {_engine.render_operand(consequent)}",
             because,
         )

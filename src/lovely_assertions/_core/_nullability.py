@@ -9,7 +9,7 @@ free, and the static widening is sound because ``self`` really is an
 
 from typing import TYPE_CHECKING, Self, cast
 
-from lovely_assertions._diff import render_operand
+from lovely_assertions import _engine
 from lovely_assertions._exceptions import hide_internal_frames
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ class NullabilityAssertions[T](ExpectBase[T]):
         """
         if self._subject is None:
             return self
-        return self._fail(f"to be None, but was {render_operand(self._subject)}", because)
+        return self._fail(f"to be None, but was {_engine.render_operand(self._subject)}", because)
 
     def is_not_none[S](
         self: "NullabilityAssertions[S | None]", *, because: str = ""

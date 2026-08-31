@@ -7,8 +7,8 @@ it is what separates this from ``assert a == b``.
 
 from typing import Self
 
+from lovely_assertions import _engine
 from lovely_assertions._core._base import ExpectBase
-from lovely_assertions._diff import describe_difference, render_operand
 from lovely_assertions._exceptions import hide_internal_frames
 
 #: pytest reads ``__tracebackhide__`` from a frame's globals, so this one
@@ -40,8 +40,9 @@ class EqualityAssertions[T](ExpectBase[T]):
         if self._subject == expected:
             return self
         return self._fail(
-            f"to equal {render_operand(expected)}, but was {render_operand(self._subject)}"
-            f"{describe_difference(self._subject, expected)}",
+            f"to equal {_engine.render_operand(expected)}, "
+            f"but was {_engine.render_operand(self._subject)}"
+            f"{_engine.describe_difference(self._subject, expected)}",
             because,
         )
 
@@ -55,4 +56,4 @@ class EqualityAssertions[T](ExpectBase[T]):
         """
         if self._subject != unexpected:
             return self
-        return self._fail(f"not to equal {render_operand(unexpected)}", because)
+        return self._fail(f"not to equal {_engine.render_operand(unexpected)}", because)

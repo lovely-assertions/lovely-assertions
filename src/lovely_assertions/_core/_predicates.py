@@ -8,6 +8,7 @@ and a failing inspector reports what it said rather than merely that it said no.
 
 from typing import TYPE_CHECKING, Self
 
+from lovely_assertions import _engine
 from lovely_assertions._core._inspection import collect_failures, describe_predicate
 from lovely_assertions._core._rendering import render_findings
 from lovely_assertions._exceptions import hide_internal_frames
@@ -20,7 +21,6 @@ from lovely_assertions._core._base import ExpectBase
 #: assignment folds every frame of this module out of an assertion failure's
 #: traceback while leaving them in place for a genuine error. See
 #: :func:`lovely_assertions._exceptions.hide_internal_frames`.
-from lovely_assertions._diff import render_operand
 
 __tracebackhide__ = hide_internal_frames
 
@@ -44,7 +44,7 @@ class PredicateAssertions[T](ExpectBase[T]):
             return self
         return self._fail(
             f"to match {describe_predicate(predicate)},"
-            f" but {render_operand(self._subject)} did not",
+            f" but {_engine.render_operand(self._subject)} did not",
             because,
         )
 
