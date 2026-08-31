@@ -6,6 +6,41 @@ enforce, so you can find out here rather than from a red build.
 By taking part you agree to the [code of conduct](CODE_OF_CONDUCT.md). The short
 version of that one: be decent to people, and criticise the code.
 
+## The terms your contribution arrives under
+
+Worth reading before you write anything substantial, because it asks something of
+you that a lot of projects do not.
+
+**You keep the copyright in what you write.** Nothing here transfers it, and your
+name stays in the history and in `CHANGELOG.md` for good.
+
+**You grant the copyright holder a licence over it** — perpetual, worldwide,
+irrevocable and sublicensable — to use your contribution and to distribute it
+under any terms, including terms other than the one in `LICENSE` today. You also
+agree to sign a formal assignment of it if you are ever asked to.
+
+The reason belongs here in plain words rather than in a file nobody opens. This
+project is open source and is meant to stay that way, but the copyright holder
+means to keep the ability to relicense it, to dual-license it, or to sell it,
+without having to track down everyone who ever landed a patch. The default rule —
+a contribution arrives under the project's own licence and grants nothing beyond
+it — turns each of those into a negotiation with every past contributor. Projects
+that skipped this step and then changed their terms anyway did real damage to
+their own communities, and the damage was mostly the surprise. Asking up front is
+how that is avoided.
+
+What it does **not** mean: nothing here lets anyone take back what is already
+published. Every release made under an open source licence stays under that
+licence, permanently, for everyone holding a copy — your contribution included.
+Relicensing only ever reaches forward, never back.
+
+If that is not a trade you want to make, say so in the pull request rather than
+walking away. A change can usually be described well enough for a maintainer to
+write it independently, and that is a perfectly good outcome for everybody.
+
+Opening a pull request is how you accept these terms; the template's checklist
+has a line for it.
+
 ## Getting set up
 
 Everything runs through [uv](https://docs.astral.sh/uv/), with the interpreter
