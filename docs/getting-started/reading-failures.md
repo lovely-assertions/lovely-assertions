@@ -3,9 +3,9 @@
 This is the half of the library you actually bought. A passing assertion is a
 comparison; a failing one has to end an investigation.
 
-## The shape of every message
+## The shape of a message
 
-Every failure is one sentence with three parts:
+Most failures are one sentence with three parts:
 
 ```
 Expected <the value> to <what should have been true>, but <what was there instead>.
@@ -26,8 +26,19 @@ Expected user_age to be greater than 18, but was 15.
 ```
 
 Three facts, none of which you have to go and look up: *which* value, what was
-required of it, and what it actually held. Compare that with what a bare
-`assert user_age > 18` gives you, which is the first two thirds of it at best.
+required of it, and what it actually held.
+
+pytest's `assert` rewriting shows you the same three — it prints your source line
+above `assert 15 > 18`. What it does not do is put them in the *message*:
+`str(exc)` is `assert 15 > 18`, with `user_age` gone. So the name survives in the
+report and nowhere else — not in the summary line, not in a log, not in a file
+pytest never rewrote.
+
+Not every failure is that sentence. The `but` half is absent where there is
+nothing to contrast — an inspection reports the failures nested inside it
+instead — and a [soft scope](../guides/soft-assertions.md) prints a numbered list
+rather than a sentence. [Failure messages](../concepts/failure-messages.md) has
+the full grammar, including the two optional parts the rest of this page adds.
 
 ## Where the name comes from
 
@@ -87,10 +98,18 @@ Expected user_age to be greater than 18, but was 15.
 Expected the applicant's age to be greater than 18, but was 15.
 ```
 
-`name=` is for when you have a value and not an expression — a loop variable, a
-parsed row. `described_as` is for when the *English* is what the reader needs:
-it goes in the sentence as written, so write it as a noun phrase that fits after
-"Expected".
+They are one mechanism: `expect(value, name=...)` calls `described_as` for you.
+Either string lands in the sentence as written, so make it a noun phrase that
+fits after "Expected". At your own `expect()` the choice between them is style —
+`name=` keeps the name beside the value, `described_as` reads better for a
+phrase.
+
+`described_as` reaches two places `name=` cannot. It names a subject you did not
+construct: the handle `expect_raises` hands back reports as `the value` until you
+describe it. And it renames from the point it appears, where `name=` covers the
+whole chain. Reach for either wherever recovery works but is useless — in a loop
+recovery names `row["n"]` identically on every iteration, and `f"rows[{index}]"`
+says which row it was.
 
 ## Adding your reason
 
@@ -121,9 +140,9 @@ the failure path of your own code.
 
 ## Composite values get a difference
 
-When the two sides of an equality are structures rather than scalars, the
-sentence is followed by an indented block saying *where* they part company. The
-block is chosen by what the values are.
+When there is more to say than the two values themselves, the sentence is
+followed by an indented block pinning the difference down. How far it can pin it
+depends on what the values are.
 
 **A mapping** names the key:
 
@@ -159,6 +178,25 @@ Expected daily_totals to equal [10, 20, 30, 40], but was [10, 20, 31, 40].
   first difference at index 2: 31 instead of 30
 ```
 
+**A set** has neither a key nor an index, so it names what is missing and what
+is extra:
+
+```python
+from lovely_assertions import expect, AssertionFailure
+
+allowed_ports = {80, 443, 8080}
+try:
+    expect(allowed_ports).is_equal_to({80, 443, 9090})
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected allowed_ports to equal {80, 9090, 443}, but was {80, 443, 8080}.
+  missing items: [9090]
+  extra items: [8080]
+```
+
 **Multi-line text** gets a unified diff:
 
 ```python
@@ -180,6 +218,27 @@ Expected rendered to equal 'line one\nline two\nline three\n', but was 'line one
     +line TWO
      line three
 ```
+
+**A long single line** has no lines to diff, so it gets the column it parts at
+and the run-up to it:
+
+```python
+from lovely_assertions import expect, AssertionFailure
+
+connection_url = "postgresql://user@db-01.internal:5432/analytics_prod"
+try:
+    expect(connection_url).is_equal_to("postgresql://user@db-01.internal:5433/analytics_prod")
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected connection_url to equal 'postgresql://user@db-01.internal:5433/analytics_prod', but was 'postgresql://user@db-01.internal:5432/analytics_prod'.
+  first difference at index 36: '2' instead of '3', after ...'r@db-01.internal:543'
+```
+
+Two short values get no block at all: both reprs are already in the sentence,
+side by side, and a second line would only repeat them.
 
 ## Messages stay a readable size
 
@@ -217,9 +276,11 @@ falling back to `repr`.
 it as a failed test rather than an erroring one, and `pytest.raises(AssertionError)`
 catches it.
 
-The library's own frames are hidden from the traceback — pytest reports the line
-in *your* test, not machinery inside `_core` — while a genuine bug inside the
-library keeps its full traceback.
+Under pytest the library's own frames are folded out of the traceback, so you
+see the line in *your* test rather than machinery inside `_core`, while a genuine
+bug inside the library keeps its full traceback. The hook is pytest's own, so
+other runners — `unittest`, a bare `python` — show the library's frames under
+your line.
 
 ---
 

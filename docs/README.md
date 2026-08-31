@@ -22,8 +22,9 @@ here follows from them:
   from the value's type, statically and at runtime, by [one table](concepts/typed-dispatch.md).
 - **Narrowing is real.** `expect(raw).is_not_none().subject` is a `str` to both
   pyright and mypy — not an `object`, not a cast.
-- **A failure is a sentence, not a diff.** It names the value, what was expected,
-  and what was there instead. [Why that matters](concepts/failure-messages.md).
+- **A failure leads with a sentence.** It names the value, what was expected, and
+  what was there instead; a diff follows only where one says something the
+  sentence cannot. [Why that matters](concepts/failure-messages.md).
 
 ---
 
@@ -108,12 +109,12 @@ The questions that decide it, answered in one place.
 
 | | |
 |---|---|
-| **Maturity** | First release. The catalogue, exception and warning assertions, the difference engine and the extension API are complete and tested. Before a 1.0 the surface can still move, so read the version as "usable and supported", not as "frozen". |
+| **Maturity** | First release. The catalogue, exception and warning assertions, the difference engine and the extension API are complete and tested. |
 | **Stability** | The public surface is `__all__`, and it is what the [reference](reference/assertions.md) documents. Until a 1.0, treat it as settled but not promised — changes are recorded in [CHANGELOG.md](../CHANGELOG.md). |
-| **Dependencies** | None, permanently, and that is a design commitment rather than a current state. Python 3.13+. |
+| **Dependencies** | None, permanently. Python 3.13+. |
 | **Cost to your suite** | A passing assertion is a comparison and a return: nothing retained, no message built. Importing the package imports almost nothing. [Performance](concepts/performance.md) says exactly what is measured and what is not. |
 | **Lock-in** | None. `expect()` is a function you import, its failures are ordinary `AssertionError`s, and it mixes freely with `assert` in the same file. There is no plugin, no fixture and no base class. |
 | **When it does not fit** | Use a plain `assert`. [Design goals](concepts/design-goals.md) is explicit about what this does *not* claim, and [Migrating](guides/migrating.md) opens by saying where a bare `assert` is still the better call. |
 | **Escape hatches** | `matches(predicate)` for a condition with no assertion; `satisfies` for nested ones; [your own assertions](guides/extending.md) with the same machinery; `.subject` to leave the library with a typed value. |
 | **Type checkers** | pyright and mypy, both strict, both green in CI on Python 3.13 and 3.14. Where they disagree, the disagreement is [written down](concepts/typing-divergences.md) rather than designed around. |
-| **Are these docs true?** | Every Python example on every page is executed by the test suite, every failure message they quote is compared against real output, and every example is type-checked. A page that drifts from the library fails the build. |
+| **Are these docs true?** | Every Python example on every page is run by the test suite — the few that cannot are marked on the page, with the reason — and every failure message they quote is compared byte for byte against what really came back. The same examples are type-checked, by pyright alone. A page that drifts from the library fails the build. |

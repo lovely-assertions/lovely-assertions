@@ -1,25 +1,24 @@
 # Installation
 
+Install it, check that it imports, and point your type checker at it. There is
+no plugin to enable, no fixture to import and no base class to inherit.
+
 ## Requirements
 
 | | |
 |---|---|
 | **Python** | 3.13 or newer |
-| **Runtime dependencies** | none, permanently |
+| **Runtime dependencies** | none, [permanently](../concepts/design-goals.md) |
 | **Type checkers** | pyright and mypy, both strict, both supported |
 | **Test runners** | pytest, `unittest`, or none at all |
 
-Python 3.13 is a floor rather than a preference. It is
-[PEP 696](https://peps.python.org/pep-0696/) — **defaults on type parameters** —
-that draws the line: the continuation type `Found[P, V, A = Expect[V]]` is a
-syntax error before 3.13, and it is what lets `.which` mean "a subject over the
-found value" without every producer spelling it out. (PEP 695's
-`def expect[T](...)` syntax arrived in 3.12 and is not the constraint.)
-
-The zero-dependency rule is worth one sentence, because it is the reason some
-things inside are built the hard way: this package is installed into test suites
-that already carry their own dependency trees, and adding to somebody else's tree
-is a cost they did not choose. It will never grow a dependency.
+Python 3.13 is a floor rather than a preference. Two of its typing features are
+load-bearing, and neither can be had on 3.12 without a dependency this package
+will not take: **defaults on type parameters**
+([PEP 696](https://peps.python.org/pep-0696/)), which is how an assertion
+declares what the rest of a chain continues on, and `typing.TypeIs`
+([PEP 742](https://peps.python.org/pep-0742/)), which the internal predicates
+return. An older interpreter is refused at install time.
 
 ## Installing
 
@@ -120,9 +119,11 @@ written down rather than designed around:
 ## Editor setup
 
 Nothing to configure. Completion after `expect(value).` comes from the return
-type of `expect()`, so any editor with a language server — Pylance, Pyright LSP,
-BasedPyright, mypy's LSP, PyCharm — offers the right catalogue for the value's
-type as soon as the package is installed in the interpreter your editor uses.
+type of `expect()`, so any editor backed by pyright — Pylance, Pyright LSP,
+BasedPyright — offers the right catalogue for the value's type as soon as the
+package is installed in the interpreter your editor uses. Editors that infer for
+themselves, PyCharm among them, read the same annotations; how faithfully they
+follow the overloads is not something this project tests.
 
 If completion shows *everything* rather than the catalogue for your value's type,
 the editor is resolving `expect` to something else or is pointed at the wrong

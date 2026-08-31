@@ -1,9 +1,7 @@
 # Chaining and narrowing
 
-Every assertion returns something you can keep asserting on. That gives you two
-different things: a way to write several checks about one value without repeating
-its name, and a way to move *down* into a value while the type checker follows
-you.
+Every assertion returns something you can keep asserting on: more checks on one
+value without repeating its name, and a way down into it both checkers follow.
 
 ## Chaining: staying on the same value
 
@@ -33,7 +31,9 @@ lines are just as correct and often clearer when the assertions are unrelated.
 ## Narrowing: `.subject`
 
 `.subject` hands back the value the chain is holding, re-typed by whatever you
-have proved about it. This is the feature that a plain `assert` cannot give you.
+have proved about it. A plain `assert raw is not None` narrows too — better,
+in fact, since it narrows the variable itself. What it cannot do is narrow *and*
+explain: when the chain fails, you get a sentence naming the subject.
 
 ```python
 from lovely_assertions import expect
@@ -48,7 +48,13 @@ DB-01
 ```
 
 To both pyright and mypy, `hostname` there is a `str` — not `str | None`, not
-`object`, and no `cast` was written. The same works for a type check:
+`object`, and no `cast` was written. That is exact while only one member
+survives. With two or more left after `None` — `int | str | None` — pyright
+still answers `int | str`, while mypy widens to `object`: sound, but not narrow
+enough to be useful. Either way, follow it with a check that names the type you
+want.
+
+The same works for a type check:
 
 ```python
 from lovely_assertions import expect
@@ -66,26 +72,31 @@ print(read_port(8080))
 8080
 ```
 
-### The honest limitation
+### The original variable is not narrowed
 
-The *original variable* is not narrowed. After
+Inside `probe` below, the assertion runs and passes, and `raw` is still
+`str | None` to both pyright and mypy on the line after it:
 
 ```python
 from lovely_assertions import expect
 
-raw: str | None = "db-01"
-expect(raw).is_not_none()
-print(type(raw).__name__)
+
+def probe(raw: str | None) -> None:
+    expect(raw).is_not_none()
+    # To both checkers, `raw` is still `str | None` here.
+    print("checked at runtime, not narrowed for the checker")
+
+
+probe("db-01")
 ```
 
 ```text
-str
+checked at runtime, not narrowed for the checker
 ```
 
-`raw` is still `str | None` as far as a checker is concerned, even though it is
-plainly a `str` at runtime. Python's `TypeGuard` and `TypeIs` can only narrow a
-function's *first positional argument*, and `expect()` captures the value inside
-a wrapper, putting the caller's variable out of reach.
+Python's `TypeGuard` and `TypeIs` can only narrow a function's *first positional
+argument*, and `expect()` captures the value inside a wrapper, putting the
+caller's variable out of reach.
 
 So narrowing flows through the value the chain returns, not backwards into the
 variable you started from. **Rebind, and you have a statically guaranteed type:**
@@ -103,10 +114,13 @@ print("rebound and re-entered")
 rebound and re-entered
 ```
 
-No Python assertion library does better than this. This one says so rather than
-implying otherwise.
+Two steps, and deliberately so: `is_not_none()` hands back a generic
+`Expect[str]`, not a `StringExpect`. It will not re-specialise, because a user's
+own `class Mine(Expect[str])` would match that overload and come back
+mislabelled. So `expect(raw).is_not_none().starts_with("db-")` runs fine and
+both checkers reject it — take `.subject` and re-enter, as above.
 
-## Descending: `.which`, `.and_` and `.whose_value`
+## Descending: `.and_`, `.which` and `.subject`
 
 Some assertions do not just pass or fail — they *find* something. Those return a
 continuation offering three ways forward:
@@ -205,7 +219,7 @@ Re-entering with `expect()` is always available and always gives you the full
 catalogue for the value's type. It is the answer whenever a continuation hands
 back something more general than you wanted.
 
-## One more rough edge, stated plainly
+## `.subject` on a list gives you a `Sequence`
 
 `expect(rows).subject` on a `list[str]` gives you a `Sequence[str]`, not a
 `list[str]`. One subject class covers lists, tuples and every other sequence,
