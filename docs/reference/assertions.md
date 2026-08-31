@@ -561,7 +561,7 @@ predicate handed to the inherited `matches` has to accept both.
 **Special values**
 
 - `is_nan(*, because: str = "") -> Self` — Assert the subject is a NaN.
-- `is_not_nan(*, because: str = "") -> Self` — Assert the subject is a real number rather than a NaN.
+- `is_not_nan(*, because: str = "") -> Self` — Assert the subject is not a NaN. Both infinities pass: neither of them is one.
 - `is_infinite(*, because: str = "") -> Self` — Assert the subject is `inf` or `-inf`.
 - `is_not_infinite(*, because: str = "") -> Self` — Assert the subject is finite. A NaN passes: it is not an infinity either.
 
