@@ -67,7 +67,6 @@ stand-in.
 """
 
 import enum
-import statistics
 import subprocess
 import sys
 import tempfile
@@ -1398,9 +1397,22 @@ def test_the_measurements_leave_the_interpreter_as_they_found_it() -> None:
 # Import cost
 # ---------------------------------------------------------------------------
 def test_importing_the_library_is_cheap() -> None:
-    """A generous bound, so it catches a real regression and never flakes."""
+    """A generous bound, so it catches a real regression and never flakes.
+
+    The *smallest* reading rather than the middle one, for the reason
+    :data:`conftest.measured` gives about the retention probes: a busy machine can
+    only make an import look slower, never faster, so the smallest is the least
+    contaminated estimate of what the import costs. The distribution has a long
+    right tail -- one sample in nine runs three times the floor with nothing else
+    on the machine -- and a median over five is not enough to stay out of it.
+
+    Nothing is weakened by that, and it was measured rather than assumed: five
+    heavy modules added at the top of the package move the floor by thirty
+    milliseconds and the median by thirty-two. Weight raises the floor; only luck
+    raises the tail, and no amount of luck lowers a floor.
+    """
     timings: list[float] = []
-    for _ in range(5):
+    for _ in range(7):
         result = subprocess.run(
             [sys.executable, "-X", "importtime", "-c", "import lovely_assertions"],
             capture_output=True,
@@ -1416,10 +1428,12 @@ def test_importing_the_library_is_cheap() -> None:
         if rows:
             timings.append(int(rows[-1].split("|")[1].strip()) / 1000)
     assert timings, "could not read an import time from -X importtime"
-    median = statistics.median(timings)
-    assert median < _IMPORT_BUDGET_MS, (
-        f"importing lovely_assertions took {median:.1f}ms, past the {_IMPORT_BUDGET_MS}ms bound. "
-        f"Something heavy is being imported at module level, or a dependency crept in."
+    floor = min(timings)
+    assert floor < _IMPORT_BUDGET_MS, (
+        f"importing lovely_assertions took {floor:.1f}ms at best, past the "
+        f"{_IMPORT_BUDGET_MS}ms bound. Something heavy is being imported at module level, "
+        f"or a dependency crept in. Every reading: "
+        + ", ".join(f"{timing:.1f}" for timing in sorted(timings))
     )
 
 
