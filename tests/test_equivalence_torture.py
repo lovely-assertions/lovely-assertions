@@ -58,6 +58,7 @@ import pytest
 
 from lovely_assertions import formatting
 from lovely_assertions._equivalence import Equivalency, close_within, compare, equivalency
+from lovely_assertions._equivalence._walk import _selection as _walk_selection
 from lovely_assertions._exceptions import hide_internal_frames
 
 if TYPE_CHECKING:
@@ -2040,14 +2041,13 @@ def classify_calls(
 ) -> tuple[int, str]:
     """How many nodes the walk resolved, and what it decided.
 
-    ``_classify`` runs exactly twice for every pair the walk takes apart and not
+    ``classify`` runs exactly twice for every pair the walk takes apart and not
     at all for one ``==`` settles, so counting it counts the walk in a unit that
     is the same on every machine. A wall-clock assertion here would be a flaky
     test wearing a useful disguise -- see ``tests/test_performance_invariants.py``.
     """
-    from lovely_assertions import _equivalence
 
-    resolve = getattr(_equivalence, "_classify")  # noqa: B009  (a private name, read as data)
+    resolve = getattr(_walk_selection, "classify")  # noqa: B009  (a private name, read as data)
     calls = 0
 
     def counted(value: object, /) -> tuple[str, tuple[str, ...]]:
@@ -2055,7 +2055,7 @@ def classify_calls(
         calls += 1
         return cast("tuple[str, tuple[str, ...]]", resolve(value))
 
-    monkeypatch.setattr(_equivalence, "_classify", counted)
+    monkeypatch.setattr(_walk_selection, "classify", counted)
     # Two statements rather than one tuple: the elements of a tuple are evaluated
     # left to right, so `return calls, compare(...)` reads the counter before the
     # comparison runs and reports zero however slow the walk was.
@@ -2172,7 +2172,7 @@ def test_a_settled_entry_holds_the_pair_whose_identities_name_it(
     """
     from lovely_assertions import _equivalence
 
-    build = getattr(_equivalence, "_Memo")  # noqa: B009  (a private name, read as data)
+    build = getattr(_equivalence, "Memo")  # noqa: B009  (a private name, read as data)
     made: list[object] = []
 
     def capture() -> object:
@@ -2180,7 +2180,7 @@ def test_a_settled_entry_holds_the_pair_whose_identities_name_it(
         made.append(memo)
         return memo
 
-    monkeypatch.setattr(_equivalence, "_Memo", capture)
+    monkeypatch.setattr(_equivalence, "Memo", capture)
     left, right = fan_in(3, 4, backref=True), fan_in(3, 4, backref=True)
     assert compare(left, right, equivalency().with_max_depth(60)) == ""
 
