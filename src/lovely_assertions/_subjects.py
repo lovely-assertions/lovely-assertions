@@ -19,10 +19,13 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from types import BuiltinFunctionType, FunctionType, MethodType
 from typing import TYPE_CHECKING, Any, cast, overload
 
-from lovely_assertions._callable import expect_raises
 from lovely_assertions._core import Expect
 from lovely_assertions._exceptions import hide_internal_frames
-from lovely_assertions._mock import FIRST_MOCK_MARKER, answers_the_protocol, is_mock
+from lovely_assertions._mock._recognition import (
+    FIRST_MOCK_MARKER,
+    answers_the_protocol,
+    is_mock,
+)
 
 if TYPE_CHECKING:
     from datetime import date, datetime, time, timedelta
@@ -127,7 +130,6 @@ _MOCK: "Callable[[Any], Expect[Any]]" = _named("_mock", "MockExpect")
 #: subjects it actually holds.
 __all__ = [
     "expect",
-    "expect_raises",
     "is_mock",
     "register",
 ]

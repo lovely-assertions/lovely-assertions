@@ -13,7 +13,7 @@ guard: a hand-picked sample of assertions leaves most of the public surface
 untouched, and the assertions nobody thought to list are where a violation
 survives. The enumeration is keyed by implementation rather than by each class
 that inherits one, and the subject classes it walks are read off the package
-rather than listed -- which is what reaches the overrides on ``_CaughtExpect``,
+rather than listed -- which is what reaches the overrides on ``CaughtExpect``,
 the handle that ``with expect_raises(...) as caught`` binds. Six assertions
 cannot have a passing exercise at all, and each is named with its reason in
 ``NO_HAPPY_PATH``.
@@ -194,7 +194,7 @@ def test_the_enumeration_finds_the_whole_surface() -> None:
     that derivation is ever narrowed back to what is exported, they go first.
     """
     assert len(PUBLIC_ASSERTIONS) > 250
-    assert ("_CaughtExpect", "where") in PUBLIC_ASSERTIONS
+    assert ("CaughtExpect", "where") in PUBLIC_ASSERTIONS
     assert ("TemporalExpect", "is_before") in PUBLIC_ASSERTIONS
     assert ("WithinDelta", "before") in PUBLIC_ASSERTIONS
 
