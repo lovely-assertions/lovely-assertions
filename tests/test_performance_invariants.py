@@ -74,7 +74,7 @@ import warnings
 from collections.abc import Awaitable
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from functools import cache, partial
+from functools import partial
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Final, NamedTuple
 from unittest.mock import Mock
@@ -1498,19 +1498,19 @@ def _added_startups(code: str, /) -> float:
     anywhere. Dividing by what an empty program costs on the same machine cancels
     that out, and turns the claim into one a reader can hold in their head --
     *loading this library costs about one and a half Python startups*.
+
+    The two readings of a round are taken back to back, and the smallest ratio of
+    any round is the answer. Measuring the empty program once and reusing it is
+    what this replaces, and the reason is a real failure: a floor read while the
+    machine was quiet, divided into a payload read while it was busy, reports a
+    library that got heavier when nothing about it changed. Both halves of a
+    round now meet the same machine, so load cancels instead of accumulating.
     """
-    return (_loaded_ms(code) - _interpreter_floor()) / _interpreter_floor()
-
-
-@cache
-def _interpreter_floor() -> float:
-    """What an empty program already costs on this machine.
-
-    Cached, because both tests below need it and each reading is seven
-    subprocesses. Caching it also pins the two tests to the same denominator, so
-    their two numbers stay comparable to each other.
-    """
-    return _loaded_ms("pass")
+    readings: list[float] = []
+    for _ in range(7):
+        floor = _loaded_ms("pass")
+        readings.append((_loaded_ms(code) - floor) / floor)
+    return min(readings)
 
 
 def test_importing_the_library_is_nearly_free() -> None:
