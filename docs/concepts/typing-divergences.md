@@ -1,5 +1,8 @@
 # Type-checker divergences
 
+Where pyright and mypy disagree about this library, what is suppressed in the
+shipped source, and the decision behind each one.
+
 pyright is the reference checker. mypy is run alongside it, both at their
 strictest settings, and both are required green before anything is committed.
 
@@ -44,8 +47,10 @@ mechanism, so each checker that reports it is told per line that it is intended:
 the `bool` and `str` overloads carry both suppressions, while the `Mapping` one
 carries mypy's alone — pyright does not report that pair, and adding its
 suppression there would fail the build, since `reportUnnecessaryTypeIgnoreComment`
-is an error here. The runtime dispatch walks the identical order, and a typed test
-pins the static half against the runtime half. See [Typed dispatch](typed-dispatch.md).
+is an error here. The runtime dispatch walks the identical order, and that table is
+pinned twice: statically in `typing_tests/positive/dispatch.py`, at runtime in
+`tests/test_narrowing.py`. Nothing compares the two lists, so keeping them in
+step is discipline rather than a guard. See [Typed dispatch](typed-dispatch.md).
 
 ### `reportPrivateUsage` (pyright)
 
@@ -83,18 +88,17 @@ mypy improves.
 
 ### A mock is statically assignable to everything
 
-typeshed puts an `Any` in `NonCallableMock`'s MRO, so a mock satisfies every
-parameter type. Every concrete overload of `expect()` therefore accepts one, and
-the first in the chain wins — so an overload written for mocks reaches a call
-only by leading the chain, where it overlaps most of the others and draws a
-`reportOverlappingOverload` per pair.
+typeshed puts an `Any` in `NonCallableMock`'s MRO, so every concrete overload of
+`expect()` accepts a mock and whichever comes first claims it —
+[Typed dispatch](typed-dispatch.md#the-one-place-the-two-halves-do-not-agree)
+demonstrates it.
 
 **Decision:** ship no static overload, and dispatch to `MockExpect` at runtime
-anyway. This is the one place the static and runtime tables are deliberately not
-the same. The static answer would cost a pile of targeted suppressions and would
+anyway — the one place the two tables deliberately disagree. An overload written
+for mocks is reached only by leading the chain, where it overlaps most of the
+others and draws a `reportOverlappingOverload` per pair. Those suppressions would
 pay only where a parameter is *declared* `Mock` — which in a real suite it often
 is not, a mock usually arriving from a fixture or an inferred assignment.
-Leaving the runtime wrong as well would cost something real and buy nothing.
 `expect(mock, as_=MockExpect)` is the typed route — see
 [Mocks](../guides/mocks.md).
 
@@ -162,14 +166,18 @@ is a checker error rather than a runtime surprise. `is_equal_to`, `is_in` and
 ### `date` and `datetime` cannot be kept apart by the type system
 
 `datetime` subclasses `date`, so a `datetime` is assignable everywhere a `date`
-is — and comparing the two raises `TypeError` in CPython. No bound can exclude a
-subtype, and the same hole exists for naive versus aware datetimes, which the
-type system cannot see at all.
+is — and *ordering* the two raises `TypeError` in CPython, while `==` quietly
+answers `False`. No bound can exclude a subtype, and the same hole exists for
+naive versus aware datetimes, which the type system cannot see at all.
 
-So the runtime catches both and raises a `TypeError` naming which side is which.
-That is deliberately *not* an assertion failure: neither is a fact about the value
-under test, both are bugs in the test itself, and reporting them as
+So the assertions that order the two, or measure the distance between them,
+catch both and raise a `TypeError` naming which side is which. That is
+deliberately *not* an assertion failure: neither is a fact about the value under
+test, both are bugs in the test itself, and reporting them as
 `Expected deadline to be before ...` would send you looking in the wrong place.
+`is_equal_to` is left alone, because `==` across the pair is well defined: a
+`date` that is not the `datetime` you expected is an ordinary failure, and the
+message prints both reprs so the mix is visible in it.
 
 ### `Found`'s third parameter is a promise, not a proof
 

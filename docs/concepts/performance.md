@@ -1,32 +1,39 @@
 # Performance
 
-An assertion library runs on every test, in every suite, on every commit. It is
-allowed to cost approximately nothing when it passes. This page is what that
-means in practice and what is actually guaranteed.
+What a passing assertion costs, what a failing one is allowed to cost, and
+which of the two the test suite holds to a number.
 
 ## The rule
 
 > **A passing assertion is a comparison and a `return self`.**
 
 No frame inspection, no source parsing, no context-variable read, no message
-built, nothing allocated that is then thrown away, and your `because=` string
-never rendered. Everything expensive happens only once a failure is certain.
+built and thrown away, and your `because=` string never rendered. Everything
+expensive happens only once a failure is certain.
 
-Two honest edges on that. `because=` is an ordinary argument, so an *expression*
-there is evaluated by Python before the call like any other — a literal is free,
-`because=explain()` is not. And a subject object is allocated per `expect()`
-call; what the suite pins is that a passing assertion **retains** nothing and
-**builds** nothing it discards.
+Three honest edges on that.
 
-That is not an aspiration in a design document — it is a set of tests that fail
-the build. The suite measures allocation over one pass of every assertion on
-every exported subject, and requires:
+`because=` is an ordinary argument, so an *expression* there is evaluated by
+Python before the call like any other — a literal is free, `because=explain()`
+is not.
 
-- a passing assertion **retains** nothing;
-- a passing assertion **builds** nothing it throws away — no message formatted
-  and discarded;
-- `.and_` allocates nothing to hand back `self`;
-- and all of the above hold for **every** exported subject, not a sample of them.
+A subject object is allocated per `expect()` call. The measurements are read
+against a reference that builds one too, so what they report is the assertion's
+own cost — and that is not always zero: an assertion that walks a collection
+allocates the iterator its `for` loop asks CPython for. Each such cost is
+recorded at the size it was measured at, and the build fails once a recorded one
+more than doubles. What none of them allocates is a message.
+
+The inspector-taking assertions — `satisfies`, `satisfies_any`,
+`satisfies_none`, `all_satisfy` and `satisfies_respectively` — run their
+inspectors with failures collected rather than raised, so they set the collector
+`ContextVar` before anything can pass. `satisfies_none` passes only when every
+branch *fails*, which means building a full message per branch to get there. The
+suite exempts those by name rather than pretending otherwise.
+
+What it pins everywhere else, over every assertion on every exported subject
+rather than a sample: nothing retained, no message formatted and discarded, and
+`.and_` allocating nothing to hand back `self`.
 
 ## Why it needs guarding
 
@@ -67,11 +74,25 @@ path freely parses your source to recover the subject's name, reads a
 `ContextVar` for formatting options, walks a registry of formatters, and computes
 a unified diff.
 
-The one bound on it is that the cost stays proportional to the *statement*, not
-to your file: name recovery indexes a source file once and answers by line number
+Two bounds on it. The cost stays proportional to the *statement*, not to your
+file: name recovery indexes a source file once and answers by line number
 afterwards, so a failing assertion in a very large test module does not re-walk
 that module — and neither does each of the failures a
 [soft scope](../guides/soft-assertions.md) collects out of it.
+
+And the expensive renderings are capped, because an assertion that takes ten
+seconds to fail is indistinguishable, to the person waiting on it, from a hung
+test run. `difflib` is never handed more than a couple of thousand changed lines,
+and a value is rendered to a fixed depth below which it prints `...`.
+
+One bound is not on the failure path at all, and it is the one you can actually
+hit. Matching the items of an unordered comparison spends a fixed allowance, and
+that allowance is spent deciding the verdict rather than reporting it — so it can
+stop a comparison that would have passed. It does not degrade quietly: when the
+allowance runs out the comparison raises `ValueError` rather than guessing a
+verdict it never reached, and the message says to compare fewer items in one
+call. A sequence is matched that way only under `ignoring_order()` — by position
+it is linear — while a set is matched that way whatever the options say.
 
 ## Importing costs almost nothing
 
@@ -96,9 +117,7 @@ Check it yourself:
 python -c "import sys; before=set(sys.modules); import lovely_assertions; print(sorted({'re','ast','difflib','linecache','datetime','enum','pathlib','dataclasses','uuid'} & (set(sys.modules)-before)))"
 ```
 
-That prints an empty list. A suite that never mentions a `Path` never pays for
-`pathlib` because of this library — and a suite that never fails an assertion
-never pays for `ast`.
+That prints an empty list.
 
 This is also why the package has **zero runtime dependencies, permanently**, and
 why several things inside are built by hand that a dependency would have
@@ -120,9 +139,10 @@ are discarded. See [Typed dispatch](typed-dispatch.md).
 
 ## Subjects are cheap objects
 
-Every subject class declares `__slots__`, including the subjects you write
-yourself. A subject holds one attribute and is allocated once per assertion, so a
-`__dict__` on each one is measurable across a real suite. If you
+Every subject class in this package declares `__slots__`, and a test fails if
+one stops. A subject holds one attribute and is allocated once per assertion, so
+a `__dict__` on each one is measurable across a real suite. That test reads the
+classes off the package, so yours is not among them: if you
 [write your own subject](../guides/extending.md), give it `__slots__ = ()`.
 
 ## Measuring it yourself
@@ -135,14 +155,15 @@ uv run python -m benchmarks
 ```
 
 Wall-clock numbers belong there because they depend on the machine. The claims
-that hold on *any* machine — no allocation on a passing assertion, a bounded
+that hold on *any* machine — no message built on a passing assertion, a bounded
 import — are in the test suite instead, where they can fail a build.
 
 ## The honest summary
 
 This is not faster than a bare `assert`. Nothing is: `assert a == b` compiles to
-a comparison and a jump. What is true is that the overhead is a function call and
-a comparison, that it allocates nothing, and that you will not find it in a
+a comparison and a jump. What is true is that the overhead is two calls, a
+comparison and one small slotted wrapper per `expect()`; that the assertion
+retains nothing and formats no message; and that you will not find it in a
 profile of your test suite. That is a smaller claim than "fast", and it is one
 that can actually be kept.
 

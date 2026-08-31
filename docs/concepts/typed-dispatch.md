@@ -45,31 +45,37 @@ are added where they belong.
 
 ## One table, written twice
 
-There are two halves to the dispatch, and they have to agree:
+There is a static half and a runtime half, and they have to agree:
 
 - **The static half** — the `@overload` chain on `expect()`. This is what a type
   checker reads, and it is the only thing your editor consults.
-- **The runtime half** — an ordered `if`/`elif` chain that actually builds the
-  object.
+- **The runtime fast path** — an exact-type table, keyed on `type(value)` by
+  identity, so the four calls above are decided by a dict lookup rather than by
+  the chain below. A subclass of a built-in is not an exact match and falls
+  through.
+- **The runtime fallback** — an ordered `if`/`elif` chain for everything the
+  table misses: subclasses, ABCs, and your own types.
 
-They are one table seen twice. If they drift, a checker promises one catalogue
-while the runtime builds another, and you get an `AttributeError` on a line that
-type-checked — precisely the failure this library exists to prevent. Changing one
-without the other is the single easiest way to break the package.
+The two sides are one table written twice: whichever of its two routes the
+runtime takes, it has to land on the subject the overloads promised. If they
+drift, a checker promises one catalogue while the runtime builds another, and you
+get an `AttributeError` on a line that type-checked — precisely the failure this
+library exists to prevent. Changing one without the other is the single easiest
+way to break the package.
 
 ## First match wins, narrow before broad
 
-Both halves are ordered, and the first match wins. The order is the mechanism,
-not tidiness, because Python's type hierarchy overlaps in ways that would
-otherwise give the wrong answer:
+The overload chain and the runtime fallback are both ordered, and the first match
+wins. The order is the mechanism, not tidiness, because Python's type hierarchy
+overlaps in ways that would otherwise give the wrong answer:
 
-| Because | The order must put |
+| Because | The dispatch has to |
 |---|---|
-| `bool` is a subclass of `int` | `bool` before `int \| float`, or `expect(True)` is a `NumericExpect` |
-| `str` is a `Sequence[str]` | `str` before `Sequence`, or `expect("x")` is a `SequenceExpect[str]` |
-| an `IntEnum` member is an `int` | enums before numbers, or `has_name` is out of reach |
-| an `Enum` class is iterable through its metaclass | classes before collections |
-| a `Mapping` is a `Collection` | `Mapping` before `Sequence` before `Collection` |
+| `bool` is a subclass of `int` | put `bool` before `int \| float` in the overloads, and give it a row in the exact-type table — the fallback chain behind that table answers `NumericExpect` |
+| `str` is a `Sequence[str]` | put `str` before `Sequence`, or `expect("x")` is a `SequenceExpect[str]` |
+| an `IntEnum` member is an `int` | put enums before numbers, or `has_name` is out of reach |
+| an `Enum` class is iterable through its metaclass | put classes before collections |
+| a `Mapping` is a `Collection` | put `Mapping` before `Sequence` before `Collection` |
 
 ```python
 from lovely_assertions import expect
