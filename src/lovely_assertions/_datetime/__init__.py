@@ -1,6 +1,6 @@
 """Dates, times and durations.
 
-``_ordered.py`` explains why these are not routed to :class:`OrderedExpect`: a
+``_ordered`` explains why these are not routed to :class:`OrderedExpect`: a
 date is orderable and is not a number, so ``is_positive`` and ``is_zero`` mean
 nothing for it, and a value on a calendar wants a vocabulary of its own --
 ``is_before``/``is_after`` rather than ``is_less_than``/``is_greater_than``.
@@ -20,7 +20,7 @@ The subject is generic over the concrete date type, so a ``date`` subject takes
 checker refuses statically what the runtime would only discover as a crash.
 
 **Both crashes stay ``TypeError``; neither becomes an assertion failure.** The
-rule is the one ``_ordered.py`` applies to a ``Decimal`` NaN: when two values
+rule is the one ``_ordered`` applies to a ``Decimal`` NaN: when two values
 cannot be compared at all, there is no verdict to report. "Passed" is untrue and
 "failed" is worse -- it would blame the subject for a mistake in the test, and a
 runner would present it as a finding about production code. So the comparison is
@@ -35,7 +35,7 @@ problem it is not.
 **A component no calendar has, and a tolerance no pair of values could satisfy,
 are ``ValueError``.** ``has_month(13)`` and ``is_close_to(x, within=-1 day)``
 could never pass whatever the subject is, which makes them the same kind of
-mistake as ``_ordered._reject_unusable_range``'s inverted bounds: a bug in the
+mistake as ``_ordered._validation.reject_unusable_range``'s inverted bounds: a bug in the
 test, raised where it was written. A tolerance of *zero* is kept, because it
 describes exactly one acceptable value rather than none -- the same reason
 ``is_between(x, x)`` is legal where ``is_strictly_between(x, x)`` is not.

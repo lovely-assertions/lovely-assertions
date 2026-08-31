@@ -864,7 +864,7 @@ TARGETS: list[tuple[str, str, str]] = [
     ("_core/__init__.py", "Expect", "Expect[T]"),
     ("_bool.py", "BoolExpect", "BoolExpect"),
     ("_string/__init__.py", "StringExpect", "StringExpect"),
-    ("_ordered.py", "OrderedExpect", "OrderedExpect[T]"),
+    ("_ordered/_subject.py", "OrderedExpect", "OrderedExpect[T]"),
     ("_numeric/_subject.py", "NumericExpect", "NumericExpect"),
     ("_collection/__init__.py", "CollectionExpect", "CollectionExpect[E, C]"),
     ("_sequence/__init__.py", "SequenceExpect", "SequenceExpect[E]"),
@@ -891,6 +891,11 @@ TARGETS: list[tuple[str, str, str]] = [
 #: banner. ``DateTimeExpect`` takes only the clock half: it inherits
 #: ``DateExpect``, which already carries the ordering half.
 SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "OrderedExpect": (
+        ("_ordered/_ordering.py", "OrderingAssertions", "Ordering"),
+        ("_ordered/_sign.py", "SignAssertions", "Sign and zero"),
+        ("_ordered/_ranges.py", "RangeAssertions", "Ranges (`is_between` includes its bounds)"),
+    ),
     "NumericExpect": (
         ("_numeric/_approximation.py", "ApproximationAssertions", "Approximation"),
         ("_numeric/_special_values.py", "SpecialValueAssertions", "Special values"),

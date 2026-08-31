@@ -70,7 +70,7 @@ def flag_is_present(subject: "Enum", other: "Enum", /) -> bool:
     what makes the test typecheck: ``Enum`` has no ``__contains__``, and
     ``Flag`` does, so narrowing both operands is how ``in`` becomes legal to
     write at all. It also keeps a passing assertion to a single call, which is
-    the shape :func:`lovely_assertions._ordered._reject_unusable_range` already
+    the shape :func:`lovely_assertions._ordered._validation.reject_unusable_range` already
     has.
 
     A caller bug, not an assertion failure: a plain ``Enum`` member supports

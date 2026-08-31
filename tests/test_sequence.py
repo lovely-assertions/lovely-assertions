@@ -1486,7 +1486,7 @@ def test_a_key_that_returns_a_nan_is_reported_too() -> None:
 
 
 def test_a_decimal_nan_signals_rather_than_being_reported() -> None:
-    """Left to propagate, the position ``_ordered.py`` states and explains.
+    """Left to propagate, the position ``_ordered`` states and explains.
 
     An ordering against a quiet ``Decimal`` NaN raises rather than answering
     false, so there is no vacuous pass to fix -- and catching it would mean
@@ -1522,10 +1522,10 @@ def test_the_nan_ordering_note_is_the_wording_the_ordered_subject_uses() -> None
     The note is restated in ``_sequence`` rather than imported, because the name
     is private to ``_ordered``. This is what keeps the copy honest.
     """
-    from lovely_assertions import _ordered
+    from lovely_assertions._ordered import _rendering
 
     stated = _pairs._NAN_ORDERING_NOTE  # pyright: ignore[reportPrivateUsage]
-    assert stated == _ordered._NAN_OPERAND_NOTE  # pyright: ignore[reportPrivateUsage]
+    assert stated == _rendering._NAN_OPERAND_NOTE  # pyright: ignore[reportPrivateUsage]
     assert stated == NAN_ORDERING_NOTE
 
 

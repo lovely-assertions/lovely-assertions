@@ -145,6 +145,6 @@ def nan_value_note(expected: object, /) -> str:
 
     ``Expected mode to have value nan, but Mode.UNKNOWN has value nan`` reads
     like a bug in the library. The note names the actual reason, exactly as
-    :func:`lovely_assertions._ordered._nan_operand_note` does for an ordering.
+    :func:`lovely_assertions._ordered._rendering.nan_operand_note` does for an ordering.
     """
     return _NAN_VALUE_NOTE if is_nan(expected) else ""

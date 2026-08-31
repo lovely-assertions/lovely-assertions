@@ -719,7 +719,7 @@ def test_a_decimal_operand_raises_as_soon_as_arithmetic_is_needed() -> None:
     measures a distance or scales a relative band by the target's magnitude meets
     the refusal. Coercing instead would mean picking one of two representations
     that deliberately disagree -- ``Decimal("0.1") == 0.1`` is false -- which is
-    the one reason to be holding a ``Decimal`` at all. ``_ordered.py`` draws the
+    the one reason to be holding a ``Decimal`` at all. ``_ordered`` draws the
     same line for the comparisons, where ``is_zero`` answers a ``Decimal`` NaN and
     ``is_positive`` signals.
     """

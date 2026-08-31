@@ -94,7 +94,7 @@ def offending_bound(subject: object, low: "Ordered", high: "Ordered", /) -> "Ord
 
 
 def reject_unusable_range(low: "Ordered", high: "Ordered", /) -> None:
-    """Raise for bounds that describe no range at all -- ``_ordered.py``'s rule.
+    """Raise for bounds that describe no range at all -- ``_ordered``'s rule.
 
     Checked before the subject is looked at, on purpose: bounds no value could
     satisfy are a bug in the test, and a subject that happened to fail would hide

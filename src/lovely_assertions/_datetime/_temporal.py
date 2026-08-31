@@ -38,7 +38,7 @@ class TemporalExpect[T: "Ordered"](Expect[T]):
     identically. What separates them -- a date has no hour, a time has no year --
     is what the public subjects add.
 
-    The bound is ``Ordered`` -- ``_ordered.py``'s protocol, reused exactly as its
+    The bound is ``Ordered`` -- ``_ordered``'s protocol, reused exactly as its
     own docstring says it is meant to be -- and **not** ``date | time``, which is
     what it looks like it should be and does not work: a type parameter bounded
     by a union has to satisfy the checker for *every* pairing of that union's
