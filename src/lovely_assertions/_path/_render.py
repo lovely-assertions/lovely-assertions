@@ -6,7 +6,7 @@ here too -- and clipped to the scope, because a deeply nested path is a line the
 reader has to scan rather than read.
 """
 
-from lovely_assertions._diff import describe_difference
+from lovely_assertions import _engine
 from lovely_assertions._exceptions import hide_internal_frames
 from lovely_assertions._formatters import format_value
 from lovely_assertions._formatting import current_formatting
@@ -119,7 +119,7 @@ def text_difference(actual: str, expected: str, /) -> str:
     """
     if len(actual) > _MAX_DIFFED or len(expected) > _MAX_DIFFED:
         return ""
-    return describe_difference(actual, expected)
+    return _engine.describe_difference(actual, expected)
 
 
 def invisible_note(actual: str, expected: str, /) -> str:

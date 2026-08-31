@@ -8,13 +8,12 @@ they can act on and one they have to reproduce.
 
 from typing import Self
 
-from lovely_assertions._core._base import ExpectBase
-
 #: pytest reads ``__tracebackhide__`` from a frame's globals, so this one
 #: assignment folds every frame of this module out of an assertion failure's
 #: traceback while leaving them in place for a genuine error. See
 #: :func:`lovely_assertions._exceptions.hide_internal_frames`.
-from lovely_assertions._diff import render_operand
+from lovely_assertions import _engine
+from lovely_assertions._core._base import ExpectBase
 from lovely_assertions._exceptions import hide_internal_frames
 
 __tracebackhide__ = hide_internal_frames
@@ -33,7 +32,7 @@ def _why_falsy(value: object, /) -> str:
     if hasattr(kind, "__len__"):
         return "it is an empty " + kind.__name__
     if kind.__module__ == "builtins":
-        return "it is " + render_operand(value)
+        return "it is " + _engine.render_operand(value)
     return kind.__name__ + ".__bool__ returned False"
 
 
@@ -65,4 +64,4 @@ class TruthinessAssertions[T](ExpectBase[T]):
         """
         if not self._subject:
             return self
-        return self._fail(f"to be falsy, but was {render_operand(self._subject)}", because)
+        return self._fail(f"to be falsy, but was {_engine.render_operand(self._subject)}", because)

@@ -8,8 +8,7 @@ equivalent; two of the same type can differ in a field neither ``__eq__`` reads.
 
 from typing import TYPE_CHECKING, Self
 
-from lovely_assertions._diff import render_operand
-from lovely_assertions._equivalence import compare, differs, equivalency
+from lovely_assertions import _engine
 from lovely_assertions._exceptions import hide_internal_frames
 
 if TYPE_CHECKING:
@@ -22,10 +21,23 @@ from lovely_assertions._core._base import ExpectBase
 #: :func:`lovely_assertions._exceptions.hide_internal_frames`.
 __tracebackhide__ = hide_internal_frames
 
+
+def _any_shape() -> "Equivalency":
+    """The default comparison, built on the first assertion that needs one.
+
+    A module-level value here would call into the equivalence engine at import
+    time, which is the one thing this seam must not do: a program that never
+    compares two object graphs should never load the machinery that does.
+    """
+    shape = globals().get("_ANY_SHAPE")
+    if shape is None:
+        shape = globals()["_ANY_SHAPE"] = _engine.equivalency()
+    return shape
+
+
 #: The default equivalence configuration, built once. It is immutable, so a
 #: shared instance is safe, and building one per call would be an allocation
 #: on the path of an assertion that is about to walk two graphs anyway.
-_ANY_SHAPE = equivalency()
 
 
 class EquivalenceAssertions[T](ExpectBase[T]):
@@ -51,7 +63,7 @@ class EquivalenceAssertions[T](ExpectBase[T]):
         ``__eq__`` can be compared at all::
 
             expect(response).is_equivalent_to(
-                expected, options=equivalency().excluding("id", "created_at")
+                expected, options=_engine.equivalency().excluding("id", "created_at")
             )
 
         ``options`` is an immutable builder, so one configuration can be named at
@@ -66,10 +78,14 @@ class EquivalenceAssertions[T](ExpectBase[T]):
         ``[1, 2]`` match ``[2, 1]`` would pass tests that ought to fail. Say
         ``ignoring_order()`` when you mean it.
         """
-        report = compare(self._subject, expected, options if options is not None else _ANY_SHAPE)
+        report = _engine.compare(
+            self._subject, expected, options if options is not None else _any_shape()
+        )
         if not report:
             return self
-        return self._fail(f"to be equivalent to {render_operand(expected)}{report}", because)
+        return self._fail(
+            f"to be equivalent to {_engine.render_operand(expected)}{report}", because
+        )
 
     def is_not_equivalent_to(
         self,
@@ -91,6 +107,8 @@ class EquivalenceAssertions[T](ExpectBase[T]):
         difference, built and then dropped unread. ``differs`` is the same walk
         stopped at the first disagreement.
         """
-        if differs(self._subject, expected, options if options is not None else _ANY_SHAPE):
+        if _engine.differs(
+            self._subject, expected, options if options is not None else _any_shape()
+        ):
             return self
-        return self._fail(f"not to be equivalent to {render_operand(expected)}", because)
+        return self._fail(f"not to be equivalent to {_engine.render_operand(expected)}", because)

@@ -86,8 +86,8 @@ in the failure branch and nowhere else -- reading it earlier would put a
 from types import FunctionType
 from typing import TYPE_CHECKING, Any, Self, cast
 
+from lovely_assertions import _engine
 from lovely_assertions._core import Expect, Found
-from lovely_assertions._diff import describe_difference
 from lovely_assertions._exceptions import hide_internal_frames
 from lovely_assertions._formatters import format_value
 from lovely_assertions._formatting import current_formatting
@@ -628,11 +628,11 @@ def _describe_call_difference(
     """
     block = ""
     if recorded[-2] != args:
-        positional = describe_difference(recorded[-2], args)
+        positional = _engine.describe_difference(recorded[-2], args)
         if positional:
             block += "\n" + _INDENT + "positional arguments:" + _deepen(positional)
     if recorded[-1] != kwargs:
-        keyword = describe_difference(recorded[-1], kwargs)
+        keyword = _engine.describe_difference(recorded[-1], kwargs)
         if keyword:
             block += "\n" + _INDENT + "keyword arguments:" + _deepen(keyword)
     return block

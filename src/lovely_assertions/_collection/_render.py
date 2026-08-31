@@ -9,7 +9,7 @@ needs to see which is which.
 
 from typing import TYPE_CHECKING
 
-from lovely_assertions._diff import stable_order
+from lovely_assertions import _engine
 from lovely_assertions._exceptions import hide_internal_frames
 from lovely_assertions._formatters import format_value
 from lovely_assertions._formatting import current_formatting
@@ -67,7 +67,7 @@ def in_message_order[T](items: "Collection[T]", /) -> "Collection[T]":
     finding: which item sits where is what the message is about.
     """
     if isinstance(items, set | frozenset):
-        return stable_order(list(items))
+        return _engine.stable_order(list(items))
     return items
 
 
