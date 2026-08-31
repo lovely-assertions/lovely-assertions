@@ -1061,9 +1061,9 @@ EXTRAS: list[tuple[str, tuple[tuple[str, str, str], ...]]] = [
     (
         "Structural comparison",
         (
-            ("_equivalence.py", "class", "Equivalency"),
-            ("_equivalence.py", "function", "equivalency"),
-            ("_equivalence.py", "function", "close_within"),
+            ("_equivalence/_options/__init__.py", "class", "Equivalency"),
+            ("_equivalence/_options/__init__.py", "function", "equivalency"),
+            ("_equivalence/_options/__init__.py", "function", "close_within"),
         ),
     ),
     (

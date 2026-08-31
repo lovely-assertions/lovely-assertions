@@ -286,7 +286,7 @@ _UNMARKED_BUILDERS: Final = frozenset(
 #: :func:`test_every_exempt_edge_is_still_load_bearing` fails if one of these
 #: stops being needed, so the list cannot rot into a blanket allow-list.
 _EXEMPT_EDGES: Final[dict[tuple[str, str], str]] = {
-    ("compare", "_render"): (
+    ("compare", "render"): (
         "`compare` is both the test and the message: two object graphs cannot be "
         "shown equivalent without walking them, and the walk's findings are the "
         'message. Its `if not findings.items: return ""` does guard the '

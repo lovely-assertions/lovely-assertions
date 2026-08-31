@@ -21,12 +21,12 @@ from lovely_assertions import (
     AssertionFailure,
     Equivalency,
     Expect,
-    _equivalence,
     close_within,
     equivalency,
     expect,
     soft_assertions,
 )
+from lovely_assertions._equivalence import _budget, _leftovers
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -232,7 +232,7 @@ class Unpoolable:  # noqa: PLW1641  (unhashable is the entire point)
     """A record nothing hashable can stand for, which is what the scan is for.
 
     ``dict`` and ``list`` are canonicalised into the pool
-    (``_equivalence._stand_in``), so a list of JSON records pairs in linear time
+    (``_leftovers._stand_in``), so a list of JSON records pairs in linear time
     and never reaches the scanning meter at all. The bound still exists and still
     has to be pinned, so the tests that pin it use a shape that genuinely cannot
     be pooled: ``__eq__`` defined and ``__hash__`` set to ``None``, which is what
@@ -463,7 +463,7 @@ def test_neither_method_is_reached_by_a_truncation_dressed_as_a_difference(
     reported as *not* equivalent to its own shuffle -- and the second assertion
     below, ``is_not_equivalent_to``, would go green.
     """
-    monkeypatch.setattr(_equivalence, "_MAX_SCANNING", 0)
+    monkeypatch.setattr(_budget, "_MAX_SCANNING", 0)
     rows = _unpoolable(4)
     shuffled = _shuffled(rows)
     with pytest.raises(ValueError, match="needed more than 0 "):
@@ -485,7 +485,7 @@ def test_json_shaped_records_pair_without_touching_the_scan(
     The allowance is set to nothing here, which is the sharpest way to say "the
     scan is not reached": a single charge against it would raise.
     """
-    monkeypatch.setattr(_equivalence, "_MAX_SCANNING", 0)
+    monkeypatch.setattr(_budget, "_MAX_SCANNING", 0)
     rows = _rows(2000)
     _both_ways(rows, _shuffled(rows), equivalent=True, options=IGNORING_ORDER)
     _both_ways(rows, _one_changed(rows, 7), equivalent=False, options=IGNORING_ORDER)
@@ -503,8 +503,8 @@ def test_a_surrogate_pairs_exactly_what_equality_pairs() -> None:
     is refused a surrogate altogether, and a value the engine cannot canonicalise
     falls back to the scan rather than to a wrong answer.
     """
-    stand_in: Callable[[object], object] = getattr(_equivalence, "_stand_in")  # noqa: B009
-    absent: object = getattr(_equivalence, "_NO_STAND_IN")  # noqa: B009
+    stand_in: Callable[[object], object] = getattr(_leftovers, "_stand_in")  # noqa: B009
+    absent: object = getattr(_leftovers, "_NO_STAND_IN")  # noqa: B009
 
     assert stand_in({"a": 1}) == stand_in({"a": 1})
     assert stand_in({"a": 1}) != stand_in({"a": 2})
@@ -545,6 +545,6 @@ def test_a_hashable_comparison_never_spends_the_scanning_allowance(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The scan is reached only by items that have no hash, which is what keeps it cheap."""
-    monkeypatch.setattr(_equivalence, "_MAX_SCANNING", 0)
+    monkeypatch.setattr(_budget, "_MAX_SCANNING", 0)
     items = list(range(500))
     _both_ways(items, _shuffled(items), equivalent=True, options=IGNORING_ORDER)

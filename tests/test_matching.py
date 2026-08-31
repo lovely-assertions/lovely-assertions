@@ -317,7 +317,7 @@ def test_an_equality_failure_names_the_matcher() -> None:
 def test_an_equivalence_failure_names_the_matcher() -> None:
     """The coupled one, and the reason ``_Matcher``'s slots are spelled oddly.
 
-    ``_equivalence._classify`` decides whether a value is a *leaf* or a *record*
+    ``_equivalence._classification.classify`` decides whether a value is a *leaf* or a *record*
     by reading its ``__slots__``, dropping only the names that both begin and end
     with an underscore. A matcher holding a plainly-named ``_kind`` would be a
     record, and this message would read ``types differ: str instead of

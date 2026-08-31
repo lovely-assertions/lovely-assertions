@@ -30,7 +30,17 @@ from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
 import pytest
 
 from lovely_assertions import _equivalence, expect, formatting, soft_assertions
-from lovely_assertions._equivalence import Equivalency, close_within, compare, equivalency
+from lovely_assertions._equivalence import (
+    Equivalency,
+    _budget,
+    _classification,
+    _labels,
+    _rendering,
+    close_within,
+    compare,
+    equivalency,
+)
+from lovely_assertions._equivalence._classification import _fields as _classified_fields
 from lovely_assertions._reflection import _cache, _fields
 
 if TYPE_CHECKING:
@@ -1307,7 +1317,7 @@ def test_a_walk_that_blows_up_reports_a_difference_rather_than_equivalence(
     def explode(*_args: object, **_kwargs: object) -> object:
         raise RuntimeError("engine bug")
 
-    monkeypatch.setattr(_equivalence, "_Walk", explode)
+    monkeypatch.setattr(_equivalence, "Walk", explode)
     rendered = compare(1, 1, equivalency())
     assert rendered != ""
     assert "the comparison could not be completed" in rendered
@@ -1321,7 +1331,7 @@ def test_a_rendering_that_blows_up_still_reports_a_difference(
     def explode(*_args: object, **_kwargs: object) -> object:
         raise RuntimeError("rendering bug")
 
-    monkeypatch.setattr(_equivalence, "_render", explode)
+    monkeypatch.setattr(_equivalence, "render", explode)
     rendered = compare(1, 2, equivalency())
     assert "could not be rendered" in rendered
 
@@ -1335,7 +1345,7 @@ def test_a_rendering_that_blows_up_does_not_invent_a_difference(
     def explode(*_args: object, **_kwargs: object) -> object:
         raise RuntimeError("rendering bug")
 
-    monkeypatch.setattr(_equivalence, "_render", explode)
+    monkeypatch.setattr(_equivalence, "render", explode)
     assert compare(1, 1, equivalency()) == ""
 
 
@@ -1444,7 +1454,7 @@ def test_unordered_matching_stops_and_names_the_bound_it_stopped_at(
     the cheap equality pass settles a shuffle outright and never reaches the
     structural pairing this bound is on.
     """
-    monkeypatch.setattr(_equivalence, "_MAX_MATCHING", 3)
+    monkeypatch.setattr(_budget, "_MAX_MATCHING", 3)
     rows = [[1, 2], [3, 4], [5, 6], [7, 8]]
     reordered = [list(reversed(row)) for row in rows]
     with pytest.raises(ValueError, match="needed more than 3 comparisons") as caught:
@@ -1468,7 +1478,7 @@ def test_a_pairing_cut_short_is_neither_verdict(monkeypatch: pytest.MonkeyPatch)
     other = [list(reversed(row)) for row in items]
     options = equivalency().ignoring_order()
     assert compare(items, other, options) == "", "with a whole allowance they are equivalent"
-    monkeypatch.setattr(_equivalence, "_MAX_MATCHING", 3)
+    monkeypatch.setattr(_budget, "_MAX_MATCHING", 3)
     with pytest.raises(ValueError, match="not a verdict, in either direction"):
         expect(items).is_equivalent_to(other, options=options)
     with pytest.raises(ValueError, match="not a verdict, in either direction"):
@@ -1665,7 +1675,7 @@ def test_unhashable_items_pair_off_before_anything_is_compared_structurally(
     may not run a single structural probe, so anything that comes back equivalent
     here was settled by equality -- which is what the second pool is for.
     """
-    monkeypatch.setattr(_equivalence, "_MAX_MATCHING", 0)
+    monkeypatch.setattr(_budget, "_MAX_MATCHING", 0)
     rows = [{"id": index} for index in range(120)]
     assert equivalent(rows, list(reversed(rows)), equivalency().ignoring_order())
 
@@ -1730,7 +1740,7 @@ class _Unpoolable:  # noqa: PLW1641  (unhashable is the entire point)
 def test_the_scanning_bound_stops_the_comparison_rather_than_answering_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(_equivalence, "_MAX_SCANNING", 2)
+    monkeypatch.setattr(_budget, "_MAX_SCANNING", 2)
     left = [_Unpoolable(1), _Unpoolable(2), _Unpoolable(3)]
     right = [_Unpoolable(3), _Unpoolable(2), _Unpoolable(1)]
     with pytest.raises(ValueError, match="needed more than 2 equality checks") as caught:
@@ -1754,7 +1764,7 @@ def test_a_scan_that_finds_nothing_is_charged_for_what_it_cost(
     The right-hand records share no identifier with the left, so the first
     expected item alone walks all three positions and returns empty-handed.
     """
-    monkeypatch.setattr(_equivalence, "_MAX_SCANNING", 2)
+    monkeypatch.setattr(_budget, "_MAX_SCANNING", 2)
     left = [_Unpoolable(1), _Unpoolable(2), _Unpoolable(3)]
     with pytest.raises(ValueError, match="needed more than 2 equality checks"):
         compare(
@@ -1776,7 +1786,7 @@ def test_a_set_can_reach_the_bound_without_anyone_asking_for_ignoring_order(
     sets on the same path, under the default configuration. Telling that caller to
     "drop ignoring_order()" names an option they never wrote and cannot remove.
     """
-    monkeypatch.setattr(_equivalence, "_MAX_MATCHING", 1)
+    monkeypatch.setattr(_budget, "_MAX_MATCHING", 1)
     left = {frozenset({("k", index)}) for index in range(3)}
     right = {frozenset({("k", index + 100)}) for index in range(3)}
     with pytest.raises(ValueError, match="needed more than 1 comparisons") as caught:
@@ -1790,7 +1800,7 @@ def test_the_scanning_bound_is_not_spent_by_hashable_items(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The second pool costs nothing at all to a comparison that does not need it."""
-    monkeypatch.setattr(_equivalence, "_MAX_SCANNING", 0)
+    monkeypatch.setattr(_budget, "_MAX_SCANNING", 0)
     items = list(range(200))
     assert equivalent(items, list(reversed(items)), equivalency().ignoring_order())
 
@@ -1799,8 +1809,8 @@ def test_a_strictly_ordered_comparison_never_reaches_the_scan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Order is the default, and the default pays nothing for the option it did not take."""
-    monkeypatch.setattr(_equivalence, "_MAX_SCANNING", 0)
-    monkeypatch.setattr(_equivalence, "_MAX_MATCHING", 0)
+    monkeypatch.setattr(_budget, "_MAX_SCANNING", 0)
+    monkeypatch.setattr(_budget, "_MAX_MATCHING", 0)
     rows = [{"id": index} for index in range(500)]
     assert equivalent(rows, [dict(row) for row in rows])
 
@@ -1851,14 +1861,14 @@ def test_differs_builds_no_report_even_when_there_is_one_to_build(
     is the number: nought for the boolean, one for the block.
     """
     rendered_reports = 0
-    render = getattr(_equivalence, "_render")  # noqa: B009  (a private name, read as data)
+    render = getattr(_equivalence, "render")  # noqa: B009  (a private name, read as data)
 
     def counted(*arguments: object) -> str:
         nonlocal rendered_reports
         rendered_reports += 1
         return cast("str", render(*arguments))
 
-    monkeypatch.setattr(_equivalence, "_render", counted)
+    monkeypatch.setattr(_equivalence, "render", counted)
     assert _equivalence.differs({"a": 1}, {"a": 2}, equivalency()) is True
     assert rendered_reports == 0, "differs built a report nobody asked for"
     assert compare({"a": 1}, {"a": 2}, equivalency()) != ""
@@ -1873,14 +1883,19 @@ def test_differs_never_reads_the_formatting_context(monkeypatch: pytest.MonkeyPa
     nothing is ever looked at, so none of those reads may happen at all.
     """
     reads = 0
-    formatting_now = getattr(_equivalence, "current_formatting")  # noqa: B009
+    # Read from its own home rather than through a module that merely imports it:
+    # the two are the same function, and only one of them is an export.
+    from lovely_assertions._formatting import current_formatting as formatting_now
 
     def counted() -> object:
         nonlocal reads
         reads += 1
         return formatting_now()
 
-    monkeypatch.setattr(_equivalence, "current_formatting", counted)
+    # Two readers, so two patches: the engine is a package now, and each module
+    # that reads the context holds its own binding for it.
+    monkeypatch.setattr(_labels, "current_formatting", counted)
+    monkeypatch.setattr(_rendering, "current_formatting", counted)
     assert _equivalence.differs(User("ann", Address("Lyon", "69"), ["a", "b"]), 3, equivalency())
     assert reads == 0, f"differs read the formatting context {reads} times"
 
@@ -1894,7 +1909,7 @@ def test_differs_reports_a_pairing_it_could_not_finish_as_neither_verdict(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A boolean has no room for a third answer, so it raises rather than guessing."""
-    monkeypatch.setattr(_equivalence, "_MAX_MATCHING", 1)
+    monkeypatch.setattr(_budget, "_MAX_MATCHING", 1)
     left = [{"id": index} for index in range(6)]
     right = [{"id": index + 100} for index in range(6)]
     with pytest.raises(ValueError, match="needed more than 1 comparisons"):
@@ -1910,7 +1925,7 @@ def test_differs_says_they_differ_when_the_walk_itself_broke() -> None:
 
     assert _equivalence.differs(1, 1, equivalency()) is False
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(_equivalence, "_Walk", explode)
+        patch.setattr(_equivalence, "Walk", explode)
         assert _equivalence.differs(1, 2, equivalency()) is True
 
 
@@ -2002,18 +2017,18 @@ def test_what_a_type_declares_is_worked_out_once_and_then_remembered(
     it on a function the walk calls twice for every pair it takes apart.
     """
     resolutions = 0
-    resolve = getattr(_equivalence, "_resolve_declared_field_names")  # noqa: B009
+    resolve = getattr(_classified_fields, "_resolve_declared_field_names")  # noqa: B009
 
     def counted(value: object, /) -> object:
         nonlocal resolutions
         resolutions += 1
         return resolve(value)
 
-    getattr(_equivalence, "_DECLARED_BY_TYPE").clear()  # noqa: B009
+    getattr(_classified_fields, "_DECLARED_BY_TYPE").clear()  # noqa: B009
     # `_ROUTE_BY_TYPE` sits in front of it and would answer for the whole
     # classification before `_declared_field_names` was ever reached.
-    getattr(_equivalence, "_ROUTE_BY_TYPE").clear()  # noqa: B009
-    monkeypatch.setattr(_equivalence, "_resolve_declared_field_names", counted)
+    getattr(_equivalence, "ROUTE_BY_TYPE").clear()  # noqa: B009
+    monkeypatch.setattr(_classified_fields, "_resolve_declared_field_names", counted)
     assert findings(_user("ann"), _user("bob")) == ["name: 'ann' instead of 'bob'"]
     first_pass = resolutions
     assert first_pass > 0, "nothing was resolved at all"
@@ -2036,9 +2051,9 @@ def test_the_type_caches_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     path empties it rather than letting it become a leak with a lookup on top.
     """
     monkeypatch.setattr(_cache, "_MAX_CACHED_TYPES", 2)
-    declared: dict[type, object] = getattr(_equivalence, "_DECLARED_BY_TYPE")  # noqa: B009
+    declared: dict[type, object] = getattr(_classified_fields, "_DECLARED_BY_TYPE")  # noqa: B009
     slots: dict[type, object] = getattr(_fields, "_SLOTS_BY_TYPE")  # noqa: B009
-    routes: dict[type, object] = getattr(_equivalence, "_ROUTE_BY_TYPE")  # noqa: B009
+    routes: dict[type, object] = getattr(_equivalence, "ROUTE_BY_TYPE")  # noqa: B009
     declared.clear()
     slots.clear()
     routes.clear()
@@ -2081,9 +2096,7 @@ def test_a_remembered_route_is_discarded_when_an_abc_takes_a_new_member() -> Non
         def __getitem__(self, index: int) -> int:
             return self.items[index]
 
-    classify: Callable[[object], tuple[str, tuple[str, ...]]] = getattr(  # noqa: B009
-        _equivalence, "_classify"
-    )
+    classify: Callable[[object], tuple[str, tuple[str, ...]]] = _classification.classify
 
     # A record while nothing claims it: its one stored field is compared by name.
     assert compare(Rowish(), Rowish(), equivalency()) == ""
@@ -2172,64 +2185,78 @@ def test_a_route_that_does_not_fit_the_expectation_is_a_difference_too() -> None
 # from a module constant.
 # ---------------------------------------------------------------------------
 def internal(name: str, /) -> Any:
-    """One of the engine's private names, read out of the module as data.
+    """One of the engine's names, read out of the package as data.
 
     A direct attribute access to a protected name across a module boundary is what
     pyright reports, which is why the rest of this file reaches for them the same
     way -- and these are wanted for what their ``repr`` says rather than for their
     types.
+
+    The package is searched rather than its front door, because most of these are
+    not on it: the engine is a package of one concern per module, and a class the
+    front door has no use for is not re-exported there just so a test can find it.
+    Searching keeps this working the next time a module is split.
     """
-    return getattr(_equivalence, name)
+    for candidate in (name, name.lstrip("_"), "_" + name.lstrip("_")):
+        if hasattr(_equivalence, candidate):
+            return getattr(_equivalence, candidate)
+    for module in vars(_equivalence).values():
+        if getattr(module, "__name__", "").startswith("lovely_assertions._equivalence."):
+            for candidate in (name, name.lstrip("_"), "_" + name.lstrip("_")):
+                if hasattr(module, candidate):
+                    return getattr(module, candidate)
+    message = f"no {name!r} anywhere in lovely_assertions._equivalence"
+    raise AttributeError(message)
 
 
 def test_a_difference_reprs_as_its_path_and_the_shape_it_shows() -> None:
-    pair = internal("_pair_difference")("user.name", "ann", "bob")
-    items = internal("_items_difference")("rows", "missing items:", [1, 2])
+    pair = internal("pair_difference")("user.name", "ann", "bob")
+    items = internal("items_difference")("rows", "missing items:", [1, 2])
 
-    assert repr(pair) == "_Difference('user.name', 'pair')"
-    assert repr(items) == "_Difference('rows', 'items')"
+    assert repr(pair) == "Difference('user.name', 'pair')"
+    assert repr(items) == "Difference('rows', 'items')"
 
 
 def test_findings_reprs_as_what_it_holds_against_what_it_will_take() -> None:
-    collector = internal("_Findings")(3)
+    collector = internal("Findings")(3)
     collector.add(internal("_note_difference")("a", "this entry could not be read"))
 
-    assert repr(collector) == "_Findings(1 of 3)"
+    assert repr(collector) == "Findings(1 of 3)"
 
 
 def test_a_budget_reprs_as_what_is_left_of_each_of_its_two_meters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Both allowances are set here, so the string cannot quietly track a constant."""
-    monkeypatch.setattr(_equivalence, "_MAX_MATCHING", 7)
-    monkeypatch.setattr(_equivalence, "_MAX_SCANNING", 9)
-    budget = internal("_Budget")()
+    monkeypatch.setattr(_budget, "_MAX_MATCHING", 7)
+    monkeypatch.setattr(_budget, "_MAX_SCANNING", 9)
+    budget = internal("Budget")()
 
     budget.spend_comparison()
     budget.spend_scans(2)
 
-    assert repr(budget) == "_Budget(6 comparisons, 7 scans left)"
+    assert repr(budget) == "Budget(6 comparisons, 7 scans left)"
 
 
 def test_a_memo_reprs_as_what_is_open_and_what_it_has_settled() -> None:
     """One open and two settled, so a repr that read the wrong field would say so."""
-    memo = internal("_Memo")()
+    memo = internal("Memo")()
 
     memo.open[(1, 2)] = 0
     memo.settled[(1, 2, 0)] = ("a", "b")
     memo.settled[(3, 4, 1)] = ("c", "d")
 
-    assert repr(memo) == "_Memo(1 open, 2 settled)"
+    assert repr(memo) == "Memo(1 open, 2 settled)"
 
 
 def test_a_walk_reprs_as_the_configuration_it_is_carrying() -> None:
     """The one of the five fields that says which comparison this walk is."""
-    walk = internal("_Walk")(
+    walk = internal("Walk")(
         equivalency().ignoring_order(),
-        internal("_Memo")(),
-        internal("_Findings")(1),
-        internal("_Budget")(),
+        internal("Memo")(),
+        internal("Findings")(1),
+        internal("Budget")(),
         False,
     )
 
-    assert repr(walk) == "_Walk(equivalency().ignoring_order())"
+    assert repr(walk) == "Walk(equivalency().ignoring_order())"
