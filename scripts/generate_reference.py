@@ -879,7 +879,7 @@ TARGETS: list[tuple[str, str, str]] = [
     ("_callable/_calling.py", "CallableExpect", "CallableExpect"),
     ("_callable/_raised.py", "RaisedExpect", "RaisedExpect[E]"),
     ("_warnings/_subject.py", "WarnedExpect", "WarnedExpect[W]"),
-    ("_type.py", "TypeExpect", "TypeExpect"),
+    ("_type/_subject.py", "TypeExpect", "TypeExpect"),
     ("_mock/_subject.py", "MockExpect", "MockExpect"),
 ]
 
@@ -905,6 +905,12 @@ SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("_callable/_continuation.py", "ContinuationAssertions", "Continuations"),
         ("_callable/_message.py", "MessageAssertions", "Message"),
         ("_callable/_notes.py", "NoteAssertions", "Notes (PEP 678)"),
+    ),
+    "TypeExpect": (
+        ("_type/_subclassing.py", "SubclassAssertions", "Inheritance"),
+        ("_type/_attributes.py", "AttributeAssertions", "Attributes and methods"),
+        ("_type/_abstractness.py", "AbstractnessAssertions", "Abstractness"),
+        ("_type/_conformance.py", "ConformanceAssertions", "Protocols"),
     ),
     "PurePathExpect": (
         ("_path/_names.py", "NameAssertions", "The pieces of a name"),
