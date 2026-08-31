@@ -123,10 +123,10 @@ def _raise_with_cause() -> None:
 
 
 def _caught() -> RaisedExpect[ValueError]:
-    """A handle from the context-manager form, which is a ``_CaughtExpect``.
+    """A handle from the context-manager form, which is a ``CaughtExpect``.
 
     ``expect_raises`` declares :class:`RaisedExpect`, because that is what the
-    ``as`` binding needs; the object is a ``_CaughtExpect``, and three of its
+    ``as`` binding needs; the object is a ``CaughtExpect``, and three of its
     assertions are its own. This is how the enumeration gets at them.
     """
     with expect_raises(ValueError) as caught:
@@ -601,10 +601,8 @@ HAPPY_CALLS: Final[dict[tuple[str, str], Callable[[World], object]]] = {
     ("RaisedExpect", "with_note_matching"): lambda _: (
         expect(_raise_with_note).raises(ValueError).with_note_matching(r"note")
     ),
-    ("_CaughtExpect", "matches"): lambda _: _caught().matches(
-        lambda error: error.args == ("boom",)
-    ),
-    ("_CaughtExpect", "where"): lambda _: _caught().where(lambda error: str(error) == "boom"),
+    ("CaughtExpect", "matches"): lambda _: _caught().matches(lambda error: error.args == ("boom",)),
+    ("CaughtExpect", "where"): lambda _: _caught().where(lambda error: str(error) == "boom"),
     # -- TypeExpect --------------------------------------------------------
     ("TypeExpect", "does_not_have_attribute"): lambda _: expect(list).does_not_have_attribute(
         "zzz"
@@ -815,7 +813,7 @@ NO_HAPPY_PATH: Final[dict[tuple[str, str], str]] = {
         "passes only when every branch *fails*, so the failure machinery is what it asserts with"
     ),
     ("Expect", "satisfies"): _NESTED,
-    ("_CaughtExpect", "satisfies"): (
+    ("CaughtExpect", "satisfies"): (
         "delegates to `Expect.satisfies` once it has checked that the failure "
         "was not already absorbed, so it inherits that exemption whole"
     ),
@@ -829,7 +827,7 @@ def subject_classes() -> tuple[type, ...]:
 
     Read off the package rather than listed, because a tuple of the exported
     classes leaves out the ones that are public in use and private in name.
-    ``_CaughtExpect`` -- the handle ``with expect_raises(...) as caught`` binds,
+    ``CaughtExpect`` -- the handle ``with expect_raises(...) as caught`` binds,
     which is the primary form of that API -- overrides ``where``, ``matches`` and
     ``satisfies``, and an enumeration derived from ``__all__`` sees none of the
     three: three public assertions with a happy path and no exercise, which is

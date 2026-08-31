@@ -876,11 +876,11 @@ TARGETS: list[tuple[str, str, str]] = [
     ("_path/_purepath.py", "PurePathExpect", "PurePathExpect[T]"),
     ("_path/__init__.py", "PathExpect", "PathExpect"),
     ("_enum.py", "EnumExpect", "EnumExpect[T]"),
-    ("_callable.py", "CallableExpect", "CallableExpect"),
-    ("_callable.py", "RaisedExpect", "RaisedExpect[E]"),
-    ("_warnings.py", "WarnedExpect", "WarnedExpect[W]"),
+    ("_callable/_calling.py", "CallableExpect", "CallableExpect"),
+    ("_callable/_raised.py", "RaisedExpect", "RaisedExpect[E]"),
+    ("_warnings/_subject.py", "WarnedExpect", "WarnedExpect[W]"),
     ("_type.py", "TypeExpect", "TypeExpect"),
-    ("_mock.py", "MockExpect", "MockExpect"),
+    ("_mock/_subject.py", "MockExpect", "MockExpect"),
 ]
 
 #: Private base classes whose assertions belong in a public subject's own
@@ -891,6 +891,21 @@ TARGETS: list[tuple[str, str, str]] = [
 #: banner. ``DateTimeExpect`` takes only the clock half: it inherits
 #: ``DateExpect``, which already carries the ordering half.
 SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "MockExpect": (
+        ("_mock/_base.py", "MockBase", "How often"),
+        ("_mock/_counting.py", "CountingAssertions", "How often"),
+        ("_mock/_arguments.py", "ArgumentAssertions", "With what"),
+        ("_mock/_continuations.py", "ContinuationAssertions", "Continuations"),
+    ),
+    "CallableExpect": (
+        ("_callable/_raising.py", "RaisingAssertions", "Raising"),
+        ("_callable/_warning_form.py", "WarningFormAssertions", "Warning"),
+    ),
+    "RaisedExpect": (
+        ("_callable/_continuation.py", "ContinuationAssertions", "Continuations"),
+        ("_callable/_message.py", "MessageAssertions", "Message"),
+        ("_callable/_notes.py", "NoteAssertions", "Notes (PEP 678)"),
+    ),
     "PurePathExpect": (
         ("_path/_names.py", "NameAssertions", "The pieces of a name"),
         ("_path/_placement.py", "PlacementAssertions", "Absoluteness"),
@@ -1022,8 +1037,8 @@ EXTRAS: list[tuple[str, tuple[tuple[str, str, str], ...]]] = [
         "Failures and scopes",
         (
             ("_exceptions.py", "class", "AssertionFailure"),
-            ("_callable.py", "function", "expect_raises"),
-            ("_warnings.py", "function", "expect_warns"),
+            ("_callable/_expect_raises.py", "function", "expect_raises"),
+            ("_warnings/_expect_warns.py", "function", "expect_warns"),
             ("_core/_soft.py", "function", "soft_assertions"),
             ("_core/_scope.py", "class", "SoftScope"),
             ("_core/_found.py", "class", "Found"),
@@ -1083,7 +1098,7 @@ EXTRAS: list[tuple[str, tuple[tuple[str, str, str], ...]]] = [
         (
             ("_subjects.py", "function", "register"),
             ("_names/_frames.py", "function", "custom_assertion"),
-            ("_mock.py", "function", "is_mock"),
+            ("_mock/_recognition.py", "function", "is_mock"),
         ),
     ),
 ]

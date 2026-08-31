@@ -42,12 +42,13 @@ from unittest.mock import (
 import pytest
 from benchmarks import blocks_allocated
 
+from _happy_calls import declared_by_the_subject
 from _package import sources
 from lovely_assertions import AssertionFailure, SequenceExpect, expect, soft_assertions
 from lovely_assertions import _mock as mock_module
 from lovely_assertions._exceptions import hide_internal_frames
 from lovely_assertions._formatting import formatting
-from lovely_assertions._mock import MockExpect, is_mock
+from lovely_assertions._mock import MockExpect, _recognition, is_mock
 from lovely_assertions._occurrence import at_least, at_most, exactly, less_than, more_than
 
 if TYPE_CHECKING:
@@ -282,7 +283,7 @@ def test_every_marker_is_load_bearing() -> None:
     sides: dropping any one name from an otherwise complete impostor must be
     noticed, and the tuple must list nothing the function does not ask for.
     """
-    markers: tuple[str, ...] = mock_module.MOCK_MARKERS
+    markers: tuple[str, ...] = _recognition.MOCK_MARKERS
     assert len(markers) == len(set(markers)) == 5
     # The value behind each name is irrelevant: `is_mock` asks whether the class
     # answers the name at all, which is the only question a class can be asked
@@ -822,8 +823,8 @@ def test_last_call_is_a_method_because_it_asserts_something() -> None:
     That asymmetry is the rule, not an inconsistency: every assertion carries a
     keyword-only ``because``, and a property has nowhere to put one.
     """
-    assert isinstance(vars(MockExpect)["calls"], property)
-    assert not isinstance(vars(MockExpect)["last_call"], property)
+    assert isinstance(declared_by_the_subject(MockExpect)["calls"], property)
+    assert not isinstance(declared_by_the_subject(MockExpect)["last_call"], property)
 
 
 def test_and_underscore_returns_the_same_subject() -> None:
@@ -911,14 +912,14 @@ def test_the_because_table_has_not_fallen_behind_the_catalogue() -> None:
     covered = {parameters.id for parameters in BECAUSE_CALLS}
     declared = {
         name
-        for name, attribute in vars(MockExpect).items()
+        for name, attribute in declared_by_the_subject(MockExpect).items()
         if not name.startswith("_") and callable(attribute)
     } - NOT_ASSERTIONS
     assert covered == declared
 
 
 def test_everything_excused_from_the_because_table_really_is_declared() -> None:
-    assert set(vars(MockExpect)) >= NOT_ASSERTIONS
+    assert set(declared_by_the_subject(MockExpect)) >= NOT_ASSERTIONS
 
 
 def test_because_is_keyword_only_even_beside_star_args() -> None:

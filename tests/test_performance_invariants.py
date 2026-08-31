@@ -824,8 +824,8 @@ _ALLOCATES_BY_DESIGN: Final[dict[_Key, tuple[int, str]]] = {
     ("StringExpect", "does_not_match"): (1094, _REGEX),
     ("StringExpect", "matches"): (1214, _REGEX),
     # -- super() -----------------------------------------------------
-    ("_CaughtExpect", "matches"): (48, _SUPER),
-    ("_CaughtExpect", "where"): (48, _SUPER),
+    ("CaughtExpect", "matches"): (48, _SUPER),
+    ("CaughtExpect", "where"): (48, _SUPER),
     # -- enumerate ---------------------------------------------------
     ("CollectionExpect", "all_are_exactly_type"): (120, _ENUMERATE),
     ("CollectionExpect", "all_are_instance_of"): (120, _ENUMERATE),
