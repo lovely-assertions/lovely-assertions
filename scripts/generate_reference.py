@@ -875,7 +875,7 @@ TARGETS: list[tuple[str, str, str]] = [
     ("_datetime/_duration.py", "TimeDeltaExpect", "TimeDeltaExpect"),
     ("_path/_purepath.py", "PurePathExpect", "PurePathExpect[T]"),
     ("_path/__init__.py", "PathExpect", "PathExpect"),
-    ("_enum.py", "EnumExpect", "EnumExpect[T]"),
+    ("_enum/_subject.py", "EnumExpect", "EnumExpect[T]"),
     ("_callable/_calling.py", "CallableExpect", "CallableExpect"),
     ("_callable/_raised.py", "RaisedExpect", "RaisedExpect[E]"),
     ("_warnings/_subject.py", "WarnedExpect", "WarnedExpect[W]"),
@@ -894,6 +894,11 @@ SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
     "NumericExpect": (
         ("_numeric/_approximation.py", "ApproximationAssertions", "Approximation"),
         ("_numeric/_special_values.py", "SpecialValueAssertions", "Special values"),
+    ),
+    "EnumExpect": (
+        ("_enum/_names.py", "NameAssertions", "Names"),
+        ("_enum/_values.py", "ValueAssertions", "Values"),
+        ("_enum/_flags.py", "FlagAssertions", "Flags (enum.Flag and enum.IntFlag only)"),
     ),
     "MockExpect": (
         ("_mock/_base.py", "MockBase", "How often"),
