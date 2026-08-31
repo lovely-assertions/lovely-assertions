@@ -195,7 +195,7 @@ def test_the_enumeration_finds_the_whole_surface() -> None:
     """
     assert len(PUBLIC_ASSERTIONS) > 250
     assert ("_CaughtExpect", "where") in PUBLIC_ASSERTIONS
-    assert ("_TemporalExpect", "is_before") in PUBLIC_ASSERTIONS
+    assert ("TemporalExpect", "is_before") in PUBLIC_ASSERTIONS
     assert ("WithinDelta", "before") in PUBLIC_ASSERTIONS
 
 
