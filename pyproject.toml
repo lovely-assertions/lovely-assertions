@@ -223,19 +223,17 @@ reportUnnecessaryTypeIgnoreComment = "error"
 
 # PEP 698, on the library and not on the corpora that test it.
 #
-# The hazard it closes is specific to a package shaped like this one: a deep
-# single-inheritance subject hierarchy in which a base method *is* the contract.
-# `Expect._fail` is overridden in two places and `_Matcher.matches` in nine;
-# rename or retype one of those bases and every override quietly becomes a new
-# method nothing calls -- a green suite and a broken subject. Sixty-eight methods
-# in `src` say `@override` now, and the decorator returns the same function
-# object, so it costs nothing at runtime.
+# The hazard it closes is specific to a package shaped like this one. A subject is
+# assembled from mixins over a common base, and a base method *is* the contract:
+# rename or retype one and every override under it quietly becomes a new method
+# nothing calls -- a green suite and a broken subject. The decorator returns the
+# same function object, so saying so costs nothing at runtime.
 #
-# In `tests` and `typing_tests` the same rule fires 173 times, and 144 of those
-# are `__repr__`, `__eq__` and `__hash__` against `object` on a test double whose
-# whole purpose is to define them. `object.__repr__` is not going to be renamed.
-# A rule that is 83% noise where it applies stops being read, so it is asked
-# where it means something.
+# In `tests` and `typing_tests` the same rule fires mostly on `__repr__`, `__eq__`
+# and `__hash__` against `object`, on a test double whose whole purpose is to
+# define them. `object.__repr__` is not going to be renamed. A rule that is mostly
+# noise where it applies stops being read, so it is asked where it means
+# something.
 [[tool.pyright.executionEnvironments]]
 root = "src"
 reportImplicitOverride = "error"

@@ -184,7 +184,7 @@ issued the warning chooses it — not this library.
 
 The case worth knowing: `warnings.warn(..., stacklevel=2)` names the *caller* of
 the function that warned. In the callable form that caller is this library's own
-invocation of your thunk, so the failure reports `_callable.py` instead of your
+invocation of your thunk, so the failure reports `_callable/_warning_form.py` instead of your
 test's line. It looks like a bug and is not one, and it cannot be fixed from
 here. `expect_warns` has no such frame in between and reports your block, so
 reach for the context-manager form when the location matters.

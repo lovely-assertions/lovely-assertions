@@ -218,7 +218,7 @@ it as a failed test rather than an erroring one, and `pytest.raises(AssertionErr
 catches it.
 
 The library's own frames are hidden from the traceback — pytest reports the line
-in *your* test, not machinery inside `_core.py` — while a genuine bug inside the
+in *your* test, not machinery inside `_core` — while a genuine bug inside the
 library keeps its full traceback.
 
 ---
