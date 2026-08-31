@@ -4,7 +4,7 @@ dynamic = ["version"]
 description = "Fluent, strictly-typed assertions for Python tests: typed discoverability, real narrowing, and failure messages that explain themselves."
 readme = "README.md"
 requires-python = ">=3.13"
-license = "MIT"
+license = "MPL-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Aymeric Pasco" }]
 keywords = ["assertions", "testing", "pytest", "fluent", "typing", "type-safe"]

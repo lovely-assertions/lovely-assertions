@@ -6,7 +6,7 @@ Fluent, strictly-typed assertions for Python tests.
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lovely-assertions/lovely-assertions/badge)](https://scorecard.dev/viewer/?uri=github.com/lovely-assertions/lovely-assertions)
 [![Python](https://img.shields.io/badge/python-3.13%20%7C%203.14-blue)](https://www.python.org/)
 [![Checked with pyright and mypy](https://img.shields.io/badge/types-pyright%20%2B%20mypy%20strict-2a6db2)](#design-commitments)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-green)](LICENSE)
 
 > **Status: 0.1.0, the first release.** The catalogue, exception and warning
 > assertions, rich differences, matchers and the extension API are in place,
@@ -193,4 +193,10 @@ provenance attestation.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[Mozilla Public License 2.0](LICENSE) — file-level copyleft. Use it in anything,
+commercial included, and nothing about your own code is affected. Modify *these*
+files and those files stay under this licence, which is the whole of the
+obligation: it reaches the files it came in, and no further.
+
+Releases up to and including `0.1.0` were published under the MIT licence and
+remain so permanently for anyone holding them. The change applies from `0.2.0`.

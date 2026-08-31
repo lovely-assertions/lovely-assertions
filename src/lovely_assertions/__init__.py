@@ -1,3 +1,10 @@
+# Copyright 2026 Aymeric Pasco.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/. Exhibit A of
+# that licence allows the notice to sit in one place a recipient will
+# look, rather than atop every file; here it is, and LICENSE is the copy.
 """Fluent, strictly-typed assertions for Python tests.
 
 ``lovely-assertions`` competes with pytest's ``assert`` rewriting on the two axes
