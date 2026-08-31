@@ -1,11 +1,9 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lovely-assertions/lovely-assertions/main/docs/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/lovely-assertions/lovely-assertions/main/docs/assets/logo.svg" alt="lovely-assertions" width="360">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lovely-assertions/lovely-assertions/main/.github/assets/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/lovely-assertions/lovely-assertions/main/.github/assets/logo.svg" alt="lovely-assertions" width="360">
   </picture>
 </p>
-
-<p align="center"><em>Your tests will fail. They may as well be lovely about it.</em></p>
 
 <p align="center">
   <a href="https://pypi.org/project/lovely-assertions/"><img alt="PyPI" src="https://img.shields.io/pypi/v/lovely-assertions"></a>
@@ -16,8 +14,10 @@
   <a href="https://github.com/lovely-assertions/lovely-assertions/blob/main/LICENSE"><img alt="License: MPL 2.0" src="https://img.shields.io/badge/license-MPL--2.0-green"></a>
 </p>
 
+# Your tests will fail. They may as well be lovely about it.
+
 Fluent, strictly-typed assertions for Python tests. `expect()` offers only what
-applies to your value's type, narrowing survives the chain, and a failure turns
+applies to your value's type. Narrowing survives the chain, and a failure turns
 up as a sentence rather than a shrug.
 
 ## Install
