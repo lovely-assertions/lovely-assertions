@@ -1,11 +1,12 @@
 # Asserting on any value
 
-These assertions live on `Expect[T]`, the root of every subject. They are
-available on **every** value you can pass to `expect()`, whatever its type — a
-string subject has them, a mapping subject has them, and so does a subject you
-[write yourself](extending.md).
+The assertions every value has, whatever its type: equality, identity, `None`,
+truthiness, membership, types and predicates.
 
-If you learn one page of the catalogue, learn this one.
+They live on `Expect[T]`, the root of every subject — a string subject has them,
+a mapping subject has them, and so does a subject you
+[write yourself](extending.md). If you learn one page of the catalogue, learn
+this one.
 
 > Full signatures for everything here: [`Expect[T]` in the reference](../reference/assertions.md#expectt).
 
@@ -23,11 +24,15 @@ print("ok")
 ok
 ```
 
-`is_equal_to` is `==`, with one addition that matters: when both sides are
-composite, the failure carries a **difference block** saying where they part
-company. Two short strings are not composite, so the failure below is one line —
-see [Reading a failure](../getting-started/reading-failures.md#composite-values-get-a-difference)
-for what a mapping, a sequence and multi-line text produce instead.
+`is_equal_to` is `==`, with one addition that matters: where the two reprs alone
+do not show what went wrong, the failure carries an indented **difference
+block** — the key that differs for a mapping, the index for a sequence, a
+unified diff for multi-line text, the column for a long single line, and, for
+two values whose reprs print the same, the fact that they are unequal at all,
+with the cause where there is one to name. Short strings are read faster side by
+side than as a diff, so the failure below is one line — see
+[Reading a failure](../getting-started/reading-failures.md#composite-values-get-a-difference)
+for the other forms.
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -74,6 +79,9 @@ complement.
 
 ## `None`
 
+`is_none()` is identity against `None`, never `== None`, so a type with a
+permissive `__eq__` cannot talk its way past. `is_not_none()` is the complement:
+
 ```python
 from lovely_assertions import expect, AssertionFailure
 
@@ -94,8 +102,9 @@ workhorse: `expect(raw).is_not_none().subject` is a `str` when `raw` was
 
 ## Truthiness
 
-`is_truthy` and `is_falsy` are `bool(subject)`, and the message tells you what
-the value actually was — which is the part `assert not x` never says:
+`is_truthy` and `is_falsy` are `bool(subject)`. When `is_truthy` fails, the
+message names which *kind* of falsy applied — a zero, an empty container,
+`None`, or a `__bool__` that said no:
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -111,6 +120,33 @@ except AssertionFailure as failure:
 Expected retry_budget to be truthy, but it is 0.
 ```
 
+For a zero a bare `assert retry_budget` says as much — pytest rewrites it to
+`assert 0`. The last kind is the one it cannot help with: a rewritten assert on
+a domain object prints its repr, which is an address.
+
+```python
+from lovely_assertions import expect, AssertionFailure
+
+
+class Cart:
+    def __init__(self) -> None:
+        self.items: list[str] = []
+
+    def __bool__(self) -> bool:
+        return bool(self.items)
+
+
+cart = Cart()
+try:
+    expect(cart).is_truthy()
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected cart to be truthy, but Cart.__bool__ returned False.
+```
+
 Prefer the specific assertion where you have one. `is_not_empty()` on a
 collection and `is_positive()` on a number both say more than `is_truthy()`, and
 `0`, `""`, `[]` and `None` are four different bugs that truthiness flattens into
@@ -118,8 +154,12 @@ one.
 
 ## Membership
 
-`is_one_of` takes the options as arguments; `is_in` takes a single container.
-Use whichever reads better where you are.
+`is_one_of` compares the subject to each option with `==`. `is_in` asks the
+container's own `__contains__`, which is not the same question:
+`expect("draft").is_in("drafts")` passes on the substring, and a `range` answers
+arithmetically without materialising anything. Write the alternatives out with
+`is_one_of`; reach for `is_in` when you already hold the container and mean its
+own idea of membership.
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -150,7 +190,8 @@ Expected environment to be in ('prod', 'dev'), but was 'staging'.
 ```
 
 `is_not_in` is the complement. There is no `is_not_one_of`: pass the options as
-a container to `is_not_in` instead.
+a container to `is_not_in` instead. `is_one_of` with no options at all raises
+`ValueError`, since a call with nothing to look for could never pass.
 
 ## Types
 
@@ -160,7 +201,7 @@ Three assertions, and the difference between them is the whole point:
 |---|---|---|
 | `is_instance_of(T)` | `isinstance(subject, T)` | **counts** |
 | `is_exactly_instance_of(T)` | `type(subject) is T` | does **not** count |
-| `as_type(T)` | `is_instance_of(T)` then continue on the value | counts |
+| `as_type(T)` | `is_instance_of(T).which`, in one step | counts |
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -189,7 +230,25 @@ is `True` in Python, and sometimes that is precisely what you need to rule out.
 they differ on exactly the same point: `is_not_instance_of(int)` **fails** for a
 `bool`, because a `bool` is an `int`.
 
-All three of the positive forms narrow. See
+`is_instance_of` and `is_exactly_instance_of` hand back a `Found`, not the
+subject. `.which` continues on the value re-typed — and re-dispatched, so
+`.which` after `is_instance_of(str)` carries the string catalogue — while
+`.and_` goes back to the original subject.
+
+```python
+from lovely_assertions import expect
+
+incoming: object = "ord-118"
+expect(incoming).is_instance_of(str).which.starts_with("ord-")
+print("ok")
+```
+
+```text
+ok
+```
+
+`as_type(T)` is those two steps spelled as one, which is why it drops the
+original subject. See
 [Chaining and narrowing](../getting-started/chaining-and-narrowing.md).
 
 ## Predicates: `matches`
@@ -213,14 +272,38 @@ except AssertionFailure as failure:
 Expected order_id to match the predicate, but 'ord-118' did not.
 ```
 
-Note what the message can and cannot say. It has the subject and the value, and
-it cannot tell you *what* the predicate wanted — a lambda has no description.
-That is the cost of `matches`, and the reason to prefer a real assertion when one
-exists. It is a good escape hatch and a poor default.
+The message has the subject and the value, and nothing about what the predicate
+wanted — a lambda has no name to print. Give the predicate one and the message
+uses it, which is usually the cheaper fix:
+
+```python
+from lovely_assertions import expect, AssertionFailure
+
+
+def ends_with_999(value: str) -> bool:
+    return value.endswith("999")
+
+
+try:
+    expect(order_id).matches(ends_with_999)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected order_id to match ends_with_999, but 'ord-118' did not.
+```
+
+Where the *reason* matters and not just the name, use `satisfies` instead: its
+nested assertions each explain themselves.
 
 ## Nested assertions: `satisfies`
 
-`satisfies` runs assertions *inside* a value and reports them as one finding:
+`satisfies` runs assertions *inside* a value and collects them: one failure
+listing everything that was wrong, rather than stopping at the first. The
+callback must *assert*, not answer — `lambda o: o["total"] > 0` returns a
+verdict, which would have passed whatever the subject was, so it raises
+`TypeError` and points you at `matches`. Neither checker catches that one.
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -262,7 +345,38 @@ Expected order to satisfy the inspection.
   - Expected its total to be positive, but was 0
 ```
 
-This is the one place naming is not optional, and it is worth the two calls.
+Naming is needed there because the lambda puts both `expect()` calls in one
+statement. Lift the inspector into a function and they are in separate
+statements again, so recovery answers for each of them. The inner names are read
+from the *helper's* source, so what they show is its parameter — name it after
+what it holds:
+
+```python
+from collections.abc import Mapping
+
+from lovely_assertions import expect, AssertionFailure
+
+
+def is_a_paid_order(order: Mapping[str, int]) -> None:
+    expect(order["total"]).is_positive()
+    expect(order["shipping"]).is_positive()
+
+
+order = {"subtotal": 4000, "shipping": 0, "total": 0}
+try:
+    expect(order).satisfies(is_a_paid_order)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected order to satisfy the inspection.
+  - Expected order["total"] to be positive, but was 0
+  - Expected order["shipping"] to be positive, but was 0
+```
+
+Two findings from one call: the second assertion ran even though the first had
+already failed.
 
 ## One of several: `satisfies_any` and `satisfies_none`
 
@@ -290,8 +404,10 @@ Expected status to satisfy at least one of 2 alternatives, but none did.
     - Expected status to equal 'closed', but was 'draft'
 ```
 
-That is the message a hand-written `assert a or b` cannot give you: it fails with
-`assert False` and leaves you to work out which half you expected to hold.
+A hand-written `assert a or b` can only re-print the expression it was given —
+pytest interleaves both comparisons and their diffs into one blob. Here each
+branch is a whole assertion chain, so every alternative explains itself in the
+words of the assertion that failed.
 
 `satisfies_none` is the complement, and names the branch that held:
 
@@ -312,8 +428,7 @@ Expected status to satisfy none of 1 alternatives, but alternative 1 held.
 Note the branches take the *subject*, not the raw value — `s` there is a
 `StringExpect`, which is why `s.starts_with(...)` works. This is the opposite of
 `satisfies` above, which hands your callback the plain value and leaves you to
-wrap it in `expect()` yourself. The two differ, and it is worth checking which
-you are writing.
+wrap it in `expect()` yourself.
 
 ## Naming and continuing
 
@@ -321,7 +436,7 @@ Three more members that are not assertions at all:
 
 | | Does |
 |---|---|
-| `described_as("...")` | names the subject for every failure after it |
+| `described_as("...")` | names the subject for every failure on that chain — a new subject from `.which` does not inherit it |
 | `.and_` | hands back the same subject, so a chain reads as a sentence |
 | `.subject` | hands back the value, re-typed by what you have proved |
 
