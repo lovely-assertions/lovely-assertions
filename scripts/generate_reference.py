@@ -1063,14 +1063,14 @@ EXTRAS: list[tuple[str, tuple[tuple[str, str, str], ...]]] = [
     (
         "How many times",
         (
-            ("_occurrence.py", "class", "Occurrence"),
-            ("_occurrence.py", "function", "exactly"),
-            ("_occurrence.py", "function", "at_least"),
-            ("_occurrence.py", "function", "at_most"),
-            ("_occurrence.py", "function", "more_than"),
-            ("_occurrence.py", "function", "less_than"),
-            ("_occurrence.py", "value", "once"),
-            ("_occurrence.py", "value", "twice"),
+            ("_occurrence/_protocol.py", "class", "Occurrence"),
+            ("_occurrence/_factories.py", "function", "exactly"),
+            ("_occurrence/_factories.py", "function", "at_least"),
+            ("_occurrence/_factories.py", "function", "at_most"),
+            ("_occurrence/_factories.py", "function", "more_than"),
+            ("_occurrence/_factories.py", "function", "less_than"),
+            ("_occurrence/_factories.py", "value", "once"),
+            ("_occurrence/_factories.py", "value", "twice"),
         ),
     ),
     (
