@@ -35,6 +35,13 @@ REFERENCE: Final = REPO_ROOT / "docs" / "reference" / "assertions.md"
 GENERATOR: Final = REPO_ROOT / "scripts" / "generate_reference.py"
 REGENERATE: Final = "uv run python scripts/generate_reference.py"
 
+#: The licence, spelled the four ways the four places that name it spell it: the
+#: SPDX identifier metadata carries, the human name the prose uses, and the line
+#: the licence text itself opens with.
+LICENCE: Final = "MPL-2.0"
+LICENCE_NAME: Final = "Mozilla Public License 2.0"
+LICENCE_TITLE: Final = "Mozilla Public License Version 2.0"
+
 #: Imported lazily, inside the function that needs them, because every one of
 #: them is only ever reached on the failure path. Importing the package must not
 #: pay for machinery that a suite of passing assertions never touches.
@@ -191,6 +198,68 @@ def test_release_please_and_the_package_agree_about_the_version() -> None:
         f"the `# x-release-please-version` marker is gone from {version_lines[0]!r}. "
         f"Without it release-please tags and writes the changelog but never updates "
         f"this line, and the package reports a stale version with nothing failing."
+    )
+
+
+def test_every_place_that_names_the_licence_names_the_same_one() -> None:
+    """The licence is written down in four places, and nothing makes them agree.
+
+    ``pyproject.toml`` is what a resolver and a corporate scanner read, the badge
+    is what a visitor reads, the prose is what a contributor reads, and ``LICENCE``
+    is the only one with legal effect. A change that reaches three of them leaves
+    the fourth asserting a licence the project is not under -- and the failure is
+    silent in the direction that matters, since nothing installs or builds any
+    differently for it.
+    """
+    with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
+        declared = tomllib.load(handle)["project"]["license"]
+    assert declared == LICENCE, f"pyproject.toml declares {declared!r}, not {LICENCE!r}"
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    badge = f"license-{LICENCE.replace('-', '--')}-"
+    assert badge in readme, f"the README badge does not read {LICENCE!r}; looked for {badge!r}"
+    assert LICENCE_NAME in readme, f"the README's licence section does not name {LICENCE_NAME!r}"
+
+    licence = (REPO_ROOT / "LICENSE").read_text(encoding="utf-8")
+    assert licence.startswith(LICENCE_TITLE), f"LICENSE does not open with {LICENCE_TITLE!r}"
+
+
+def test_the_licence_file_carries_the_text_and_nothing_else() -> None:
+    """A preamble in ``LICENSE`` is how a repository silently stops having a licence.
+
+    GitHub identifies a licence by matching this file against a corpus and needs a
+    near-exact match after normalisation, so a copyright line or a note added above
+    or below the text drops the repository to "Other" in the sidebar and to
+    ``NOASSERTION`` in the API that scanners read. Nothing fails when that happens;
+    the project simply stops looking licensed to every tool that asks. The notice
+    naming the copyright holder belongs in the source, which is where Exhibit A
+    puts it, and this test exists to keep it from migrating here.
+    """
+    lines = (REPO_ROOT / "LICENSE").read_text(encoding="utf-8").splitlines()
+    assert lines[0] == LICENCE_TITLE, f"LICENSE begins {lines[0]!r}, not with the licence text"
+    last = next(line for line in reversed(lines) if line.strip())
+    assert last.strip().endswith("Mozilla Public License, v. 2.0."), (
+        f"LICENSE ends {last.strip()!r}, so something has been appended after Exhibit B"
+    )
+
+
+def test_the_shipped_source_carries_the_licence_notice() -> None:
+    """Exhibit A wants the notice in the source, and one file is where we put it.
+
+    The alternative Exhibit A allows -- one place a recipient would look, rather
+    than a header on all of them -- only holds while that one place still says it.
+    The package entry point is the file every user imports, so it is the one that
+    travels with the code into an environment where ``LICENSE`` may not.
+    """
+    entry = (REPO_ROOT / "src" / "lovely_assertions" / "__init__.py").read_text(encoding="utf-8")
+    assert "Mozilla Public" in entry, (
+        "src/lovely_assertions/__init__.py no longer names its licence, so the "
+        "shipped source carries no notice at all once LICENSE is left behind."
+    )
+    assert "Copyright" in entry, (
+        "src/lovely_assertions/__init__.py no longer names a copyright holder, "
+        "which is the half of the notice Exhibit A calls an accurate notice of "
+        "copyright ownership."
     )
 
 
