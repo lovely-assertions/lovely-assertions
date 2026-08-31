@@ -1,78 +1,58 @@
-# lovely-assertions
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/lovely-assertions/lovely-assertions/main/docs/assets/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/lovely-assertions/lovely-assertions/main/docs/assets/logo.svg" alt="lovely-assertions" width="360">
+  </picture>
+</p>
 
-Fluent, strictly-typed assertions for Python tests.
+<p align="center"><em>Your tests will fail. They may as well be lovely about it.</em></p>
 
-[![CI](https://github.com/lovely-assertions/lovely-assertions/actions/workflows/ci.yml/badge.svg)](https://github.com/lovely-assertions/lovely-assertions/actions/workflows/ci.yml)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lovely-assertions/lovely-assertions/badge)](https://scorecard.dev/viewer/?uri=github.com/lovely-assertions/lovely-assertions)
-[![Python](https://img.shields.io/badge/python-3.13%20%7C%203.14-blue)](https://www.python.org/)
-[![Checked with pyright and mypy](https://img.shields.io/badge/types-pyright%20%2B%20mypy%20strict-2a6db2)](#design-commitments)
-[![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-green)](LICENSE)
+<p align="center">
+  <a href="https://pypi.org/project/lovely-assertions/"><img alt="PyPI" src="https://img.shields.io/pypi/v/lovely-assertions"></a>
+  <a href="https://www.python.org/"><img alt="Python 3.13 and 3.14" src="https://img.shields.io/badge/python-3.13%20%7C%203.14-blue"></a>
+  <a href="https://github.com/lovely-assertions/lovely-assertions/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/lovely-assertions/lovely-assertions/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=lovely-assertions_lovely-assertions"><img alt="Quality gate" src="https://sonarcloud.io/api/project_badges/measure?project=lovely-assertions_lovely-assertions&amp;metric=alert_status"></a>
+  <a href="https://sonarcloud.io/component_measures?id=lovely-assertions_lovely-assertions&amp;metric=coverage"><img alt="Coverage" src="https://sonarcloud.io/api/project_badges/measure?project=lovely-assertions_lovely-assertions&amp;metric=coverage"></a>
+  <a href="https://github.com/lovely-assertions/lovely-assertions/blob/main/LICENSE"><img alt="License: MPL 2.0" src="https://img.shields.io/badge/license-MPL--2.0-green"></a>
+</p>
 
-> **Status: 0.1.0, the first release.** The catalogue, exception and warning
-> assertions, rich differences, matchers and the extension API are in place,
-> tested and documented. Before 1.0 the API may still move; when it does, the
-> reason is in [CHANGELOG.md](CHANGELOG.md), which is generated from the commit
-> log rather than written by hand.
+Fluent, strictly-typed assertions for Python tests. `expect()` offers only what
+applies to your value's type, narrowing survives the chain, and a failure turns
+up as a sentence rather than a shrug.
 
 ## Install
 
 ```bash
-pip install lovely-assertions
+uv add --dev lovely-assertions   # or: pip install lovely-assertions
 ```
 
-Or, with uv:
+Python 3.13 or newer, zero runtime dependencies, `py.typed`. Pre-1.0, so the API
+can still move; when it does, the reason is in
+[CHANGELOG.md](CHANGELOG.md), generated from the commit log rather than written
+by hand.
 
-```bash
-uv add --dev lovely-assertions
-```
-
-It has no runtime dependencies and it needs Python 3.13 or newer.
+## A minute with it
 
 ```python
 from lovely_assertions import expect
 
 expect("hello").starts_with("he")
-```
-
-## Why another assertion library
-
-The competition is not `assertpy` or `PyHamcrest` — it is pytest's own `assert`
-rewriting, which already introspects `assert a == b` and prints a decent diff.
-So the value has to be somewhere else, and it is in three places. Break any one
-of them and the package has no reason to exist.
-
-**Typed discoverability.** `expect(x).` offers only the assertions that are valid
-for the type of `x`. A raw `assert` never does that, and neither does any
-assertion library that dispatches dynamically.
-
-```python
-expect("hello").starts_with("he")  # str assertions
 expect([1, 2, 3]).contains_no_duplicates()
 expect({"a": 1}).contains_key("a")
-expect(3).is_positive()  # `starts_with` is not offered here
+expect(3).is_positive()
 ```
 
-**Real narrowing.** The subject a chain returns is re-typed, statically, and both
-pyright and mypy agree:
+Your editor knows there is no `starts_with` on that last line: `expect(x).` is
+the catalogue for the type of `x`, and nothing else. A check is also a
+narrowing, and both pyright and mypy agree about the result:
 
 ```python
 raw: str | None = "ada"
-payload: object = 7
 
 name: str = expect(raw).is_not_none().subject
-count: int = expect(payload).is_instance_of(int).subject
 ```
 
-Honest limitation, stated up front: the *original variable* stays `str | None` as
-far as the checker is concerned. Python's `TypeGuard`/`TypeIs` can only narrow a
-function's first positional argument, and `expect()` captures the subject inside
-a wrapper, so the caller's variable is out of reach. Narrowing therefore flows
-through the returned subject — rebind it, and you have a statically guaranteed
-type. No Python assertion library does better; this one says so instead of
-pretending otherwise.
-
-**Failure messages that locate the problem.** The competition prints a diff; this
-prints an explanation.
+And when something is wrong, you are told what:
 
 ```python
 from lovely_assertions import soft_assertions
@@ -90,41 +70,37 @@ with soft_assertions():
   (3) Expected config to contain entry 'port': 9090, but that key held 8080.
 ```
 
-(One scope, three failures, one report — that is
-[soft assertions](docs/guides/soft-assertions.md), and it is why you see all
-three instead of only the first.)
+Three failures, one report — that is
+[soft assertions](docs/guides/soft-assertions.md). And look at the last two:
+*the key is missing* and *the key holds something else* are different bugs, and
+the sentence says which instead of leaving you to work it out.
 
-That last pair is the point: *the key holds a different value* and *the key is
-missing* are different bugs, and the message says which instead of leaving you to
-find out. Equality on a composite value adds a difference block — a unified diff
-for multi-line text, the first offending index for a sequence, the keys that moved
-for a mapping — and it stays bounded, so comparing two five-thousand-element lists
-is four hundred characters, not sixty thousand.
+## Why not just `assert`
 
-## What else you get
+pytest already rewrites `assert a == b` into a passable diff, so the competition
+is pytest itself and the value has to be elsewhere. It is in three places, and
+breaking any one of them would leave this package with no reason to exist.
 
-**Exceptions, in the form you already reach for.**
+- **Typed discoverability.** A `str` subject has no `is_positive`. Nothing that
+  dispatches at runtime can offer that, and neither can a raw `assert`.
+- **Real narrowing.** The returned subject is re-typed, as above. The *original*
+  variable is not: `TypeIs` reaches only a function's first argument, so rebind
+  and the type is guaranteed. No Python assertion library does better, and this
+  one [writes the limitation down](docs/getting-started/chaining-and-narrowing.md)
+  rather than implying otherwise.
+- **Messages that explain.** A composite value adds a difference block that stays
+  bounded, so two five-thousand-element lists cost four hundred characters, not
+  sixty thousand.
 
-```python
-from lovely_assertions import expect_raises
+## Also in the box
 
-
-def parse(text: str) -> int:
-    return int(text)
-
-
-with expect_raises(ValueError) as caught:
-    parse("nope")
-caught.with_message_containing("invalid literal")
-```
-
-When the wrong exception is raised, the failure is chained onto the real one, so
-its traceback survives next to the message rather than being replaced by it.
-
-**Your own assertions, with the same machinery.** Subclass `Expect[T]`, mark your
-methods with `@custom_assertion`, and they get subject naming, soft scopes,
-`because` and the whole inherited catalogue. See
-[the extension guide](docs/guides/extending.md).
+- **Exceptions**, in the shape you already reach for: `with
+  expect_raises(ValueError) as caught:`, then `caught.with_message_containing(…)`.
+  The wrong exception is chained onto the failure, so its traceback survives
+  beside the message instead of replacing it.
+- **Your own assertions**, on the same machinery: subclass `Expect[T]`, mark the
+  methods `@custom_assertion`, and inherit subject naming, soft scopes, `because`
+  and the whole catalogue. See [the extension guide](docs/guides/extending.md).
 
 ## Documentation
 
@@ -138,55 +114,30 @@ methods with `@custom_assertion`, and they get subject naming, soft scopes,
 | Why it works this way | [Concepts](docs/README.md#concepts) — dispatch, messages, performance, typing |
 | Coming from `assert` or `assertpy` | [Migrating](docs/guides/migrating.md) |
 
-Every Python example in those pages is executed by the test suite, and every
+Every Python block on those pages is executed by the test suite, and every
 failure message they quote is compared against what the library actually
-produces.
+produces. That includes this page.
 
-## Design commitments
-
-- **Zero runtime dependencies**, permanently. Python 3.13+.
-- **A passing assertion costs a comparison and a `return self`** — no frame
-  inspection, no message building, no context lookups. Failure messages are
-  formatted only in the failure branch, never as an argument to a helper.
-- **`py.typed`, 100% annotated, pyright strict and mypy strict both green in CI.**
-  Where mypy and pyright genuinely disagree, the divergence is documented and
-  frozen — the API never gets shaved down to accommodate a checker.
-- **The typing surface is tested like any other surface**, with a negative corpus
-  that both checkers are required to reject. Every line that must be rejected
-  carries an `expect-error` marker, and the harness is symmetric: a marked line
-  no checker reports fails the suite, and a reported line nobody marked fails it
-  too. A harness that cannot detect a wrong `assert_type` proves nothing about
-  the ones it accepts.
-- **Messages are tested as output, not as behaviour.** A message is not wrong for
-  being sixty thousand characters long — no assertion fails because of it — so
-  size and shape are pinned explicitly.
-
-## Development
+## Contributing
 
 ```bash
 uv sync
-```
-
-Then, all of which must be green:
-
-```bash
 uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run mypy && uv run pytest
 ```
 
-[CONTRIBUTING.md](CONTRIBUTING.md) has the rest: what a change usually touches,
-what CI runs and what each gate proves, and how a release is cut. Taking part
-means agreeing to the [code of conduct](CODE_OF_CONDUCT.md).
+Every one of those must be green. [CONTRIBUTING.md](CONTRIBUTING.md) has the rest: what a change usually touches,
+what each CI gate proves, how a release is cut, and the terms a contribution
+arrives under. Taking part means agreeing to the
+[code of conduct](CODE_OF_CONDUCT.md).
 
 ## Security
 
 Report a vulnerability privately through the
 [Security tab](https://github.com/lovely-assertions/lovely-assertions/security),
-not as a public issue. [SECURITY.md](SECURITY.md) also sets out what this library
+not as a public issue. [SECURITY.md](SECURITY.md) also documents what the library
 does on the failure path — it renders your values, and it reads the source line
-you wrote the assertion on — so that the boundary is documented rather than
-discovered.
-
-Releases are published through PyPI
+you wrote the assertion on — so the boundary is written down rather than
+discovered. Releases go out through PyPI
 [Trusted Publishing](https://docs.pypi.org/trusted-publishers/), with no API
 token anywhere in this repository, and every artifact carries a signed build
 provenance attestation.
