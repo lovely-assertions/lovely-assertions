@@ -1,9 +1,9 @@
 """``expect()``: the single entry point, and the dispatch that picks a subject.
 
-Each subject lives in its own module -- ``_string.py``, ``_numeric.py`` and so on
--- because each carries a full assertion catalogue and one file holding all of
-them would be unreviewable. This module is the façade: it re-exports the subjects
-and owns the dispatch.
+Each subject lives in its own package -- ``_string``, ``_numeric`` and so on --
+because each carries a full assertion catalogue, split there into one file per
+family of question. This module is the façade: it re-exports the subjects and
+owns the dispatch.
 
 The static overload order and the runtime dispatch order are **one table seen
 twice**: ``bool`` before ``int`` because ``bool`` is an ``int``, ``str`` before
