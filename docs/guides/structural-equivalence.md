@@ -34,7 +34,9 @@ equivalent
 ```
 
 It walks both sides member by member and understands dataclasses, `NamedTuple`s,
-anything with `__slots__` or a `__dict__`, mappings and collections.
+`attrs` classes and pydantic models, mappings and collections, and anything else
+with `__slots__` or a `__dict__`. Neither `attrs` nor pydantic is imported to do
+it — the shapes are recognised by what they leave on the class.
 
 ## Why not just `==`
 
@@ -46,7 +48,7 @@ Three situations where `==` is the wrong question:
 - The difference you want reported is *several* differences, and `==` gives you
   one boolean.
 
-## Every difference at once, each with a path
+## Many differences at once, each with a path
 
 ```python
 from dataclasses import dataclass
@@ -82,11 +84,15 @@ Expected saved to be equivalent to Customer(name='Ada', address=Address(city='Pa
 
 Two findings, each with the **dotted path** that locates it in the graph — and
 the trailing line states the configuration it compared under, so you are never
-guessing which rules were in force.
+guessing which rules were in force. A path from a failure message is a path you
+can paste into `excluding_path`.
 
-Those paths are not decoration: they are exactly what `excluding_path` accepts,
-so a path you can see in a failure is a path you can paste straight back into a
-configuration.
+Ten differences are printed and two hundred are collected. Past either bound the
+message says so on its own line — `... (n more differences)`, `... (the
+comparison stopped at 200 differences)`. `formatting(max_items=...)` raises the
+first; see [controlling output](controlling-output.md#bounds-formatting). The
+second is not an option, because a caller who could raise it could hang a test
+run.
 
 `is_not_equivalent_to` is the complement, and takes the same `options=`. Use it
 to assert that a transformation actually changed something — a redaction that
@@ -114,6 +120,11 @@ print("ignored the generated fields")
 ignored the generated fields
 ```
 
+`excluding("id")` drops the field from the comparison and so asserts nothing
+about it; a [matcher](matchers.md) keeps it and checks its shape, so
+`{"id": any_instance_of(int)}` still says the id is an integer. Exclude what the
+test has no opinion about, match what it does.
+
 By default the expectation is a **subset** *of a record*: fields the subject has
 and the expectation does not mention are ignored, and fields the expectation
 names and the subject lacks are reported. The two options below move each of
@@ -128,13 +139,20 @@ is the more likely bug.
 |---|---|
 | `excluding(*names)` | ignore members by name, at any depth |
 | `excluding_path(*paths)` | ignore these paths **and everything beneath them**, e.g. `address` |
-| `including(*names)` | compare only these members |
+| `including(*names)` | compare only these members — `excluding` still wins where the two disagree |
 | `excluding_missing()` | ignore members the **expectation** names that the subject does not have |
 | `ignoring_order()` | compare collections as multisets |
-| `with_max_depth(n)` | bound how deep the walk goes |
+| `with_max_depth(n)` | descend at most `n` levels; below that, compare with `==` |
 | `using(kind, comparator)` | compare values of `kind` with your own function |
 | `comparing_all_members()` | also fail on members the **subject** has that the expectation does not mention |
 | `comparing_enums_by_name()` | match enum members by name rather than value |
+
+The depth default is ten levels — the `maximum depth 10` every failure message on
+this page is reporting. Below it the walk stops taking values apart and compares
+with `==` instead, and says so where that comparison fails: `(not taken apart:
+the maximum depth of 10 stops here)`. A graph deeper than ten whose leaves never
+defined `__eq__` therefore fails against a rebuilt copy of itself — the very case
+equivalence exists to cure — until `with_max_depth()` is raised past it.
 
 ### Order
 
@@ -263,13 +281,30 @@ turns your failing test into an error raised inside the assertion library. The
 guards are per member, so one hostile field of a twelve-field record costs that
 field and not the other eleven.
 
-Two things do raise, and neither is a property of one value. A *misconfigured
-call* raises at the call, where the mistake is. And an **unordered** comparison
-that would need more than a hundred thousand pairings gives up with a
-`ValueError` rather than answering: an unfinished matching is not a verdict in
-either direction, and silently calling it equivalent would be the dangerous way
-to fail. A `set` is matched that way whatever the options say, so a very large set
-is the case to watch — compare fewer items in one call.
+Three things do raise, and none is a property of one value. A *misconfigured
+call* raises at the call, where the mistake is. An **unordered** comparison that
+runs out of its pairing allowance gives up with a `ValueError` rather than
+answering: an unfinished matching is not a verdict in either direction, and
+silently calling it equivalent would be the dangerous way to fail. And a walk
+that uses up the interpreter's stack before it finishes raises `ValueError` for
+that same reason — lower `with_max_depth()`, compare a smaller part of the
+graph, or raise `sys.setrecursionlimit()`.
+
+The pairing allowance runs to a couple of hundred items on each side that nothing
+pairs off by equality, or a few thousand unhashable ones in the cheap `==` pass
+that runs before it. A `set` is matched without regard to order whatever the
+options say, so a set whose items mostly *fail* to pair off is the case to watch:
+the cost is in the leftovers, not in the size. Two hundred thousand ints
+differing in one place answer at once; two hundred and fifty records that pair
+with nothing exhaust it — compare fewer items in one call.
+
+### A name nothing carries selects nothing
+
+`including("totl")` selects no member, and two records with no selected member
+between them are equivalent — so the typo passes, silently, having compared
+nothing. `excluding` every field gives the same answer. Only `excluding_path("")`
+is refused at the call, because that one names the root and can be caught there.
+Spell these names against the paths a failure message prints.
 
 ### An index path stops working once order is ignored
 

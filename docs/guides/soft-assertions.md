@@ -73,6 +73,31 @@ Outside a soft scope that chain stops at the first failure and reports one thing
 Inside one, a failed assertion still returns its subject, so the chain continues
 and all three are collected.
 
+The exception is an assertion that was meant to **narrow** the subject —
+`is_not_none`, `is_instance_of`, `contains_key`. There is no narrowed value to
+hand back, so it absorbs the rest of *that* chain instead of reporting failures
+derived from the one that already happened. The block itself carries on:
+
+```python
+from lovely_assertions import expect, soft_assertions, AssertionFailure
+
+try:
+    with soft_assertions():
+        expect(server_config).contains_key("hostname").whose_value.is_equal_to("web-01")
+        expect(server_config).contains_entry("port", 5432)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+2 assertions failed:
+  (1) Expected server_config to contain key 'hostname' (did you mean 'host'?), but the keys were ['host', 'port'].
+  (2) Expected server_config to contain entry 'port': 5432, but that key held 8080.
+```
+
+The `whose_value` check is never reported. A check that does not depend on the
+narrowing belongs in its own `expect(...)`.
+
 ## Everything reports through it
 
 Soft scopes are not a feature of a few assertions. Every failure in the library
@@ -140,50 +165,25 @@ the value each finding came from. An inner scope hands its failures **up** to th
 scope containing it, so only the outermost one raises — which means a helper that
 opens its own scope composes whether or not its caller has one.
 
-Nesting without names is safe and buys you nothing: the inner findings arrive in
-the outer report indistinguishable from the rest. Name them, or do not nest.
+An unnamed nested scope adds nothing to the report — its findings arrive
+indistinguishable from the rest. Nest for a name, for block-scoped formatters, or
+for a `discard()` you want to keep off the outer report. Otherwise do not nest.
 
 ## Scoping formatters to a block
 
-`soft_assertions` is also the sanctioned way to change *rendering* for one block,
-overriding the globally registered formatters for as long as it runs:
-
-```python
-from lovely_assertions import expect, soft_assertions, AssertionFailure
-
-
-class Terse:
-    def can_handle(self, value: object, /) -> bool:
-        return isinstance(value, list)
-
-    def format(self, value: object, /) -> str:
-        assert isinstance(value, list)
-        return f"<{len(value)} rows>"
-
-
-audit_rows = [1, 2, 3]
-try:
-    with soft_assertions(formatters=(Terse(),)):
-        expect(audit_rows).is_equal_to([1, 2])
-except AssertionFailure as failure:
-    print(failure)
-```
-
-```text
-1 assertion failed:
-  (1) Expected audit_rows to equal <2 rows>, but was <3 rows>.
-        lengths differ: 3 items, expected 2
-        extra items: [3]
-```
-
+`soft_assertions(formatters=(...,))` puts value formatters in front of the
+globally registered ones for as long as the block runs, innermost scope outwards.
 Global registration is write-once at import, because assertion state a test can
-mutate stops being safe the moment the runner goes parallel. This is the per-test
-escape hatch. See [Controlling output](controlling-output.md).
+mutate stops being safe the moment the runner goes parallel — so a scope is the
+only way to give one test a formatter of its own. See
+[Controlling output](controlling-output.md#where-to-register).
 
 ## Taking the failures instead of raising
 
-`scope.discard()` hands you the collected messages and leaves the scope with
-nothing to raise:
+`scope.discard()` hands you the failures collected so far and empties the scope.
+It leaves the scope open and still collecting, so a block that discards at the end
+leaves quietly, while an assertion failing after the call still raises on the way
+out:
 
 ```python
 from lovely_assertions import expect, soft_assertions
@@ -222,17 +222,20 @@ except AssertionFailure as failure:
   (1) Expected 1 to equal 2, but was 1.
 ```
 
-Note the singular — "1 assertion failed", not "1 assertions failed". The count
-reads as English, because the message is meant to be read.
-
 A scope is **not reentrant** — you cannot enter the same one twice at once — but
 it is reusable once it has closed.
 
 ## Thread and task safety
 
-The active scope lives in a `ContextVar`, not a global. One thread's or one
-asyncio task's collected failures never reach another's, so a suite that runs in
-parallel does not turn a fixed message into a flaky one.
+The active scope lives in a `ContextVar`, not a global, so sibling threads and
+sibling tasks never see each other's scopes — a suite that runs in parallel does
+not turn a fixed message into a flaky one.
+
+Threads and tasks part company inside a block. A thread started in an open block
+gets no scope at all, and its failures raise where they happen. An asyncio task
+inherits a copy of the context, and a copy holds the same collector: a task
+started in an open block reports into that block, and a task that fails after the
+block has exited raises rather than joining a report nobody will read.
 
 Nothing about a soft scope costs a passing assertion anything: the `ContextVar`
 is read on the failure path only.

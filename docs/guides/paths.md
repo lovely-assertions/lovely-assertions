@@ -92,6 +92,9 @@ Expected Path("missing.txt") to exist, but nothing is there at 'missing.txt'.
 Expected notes to be a directory, but 'notes.txt' is a regular file.
 ```
 
+The family: `exists`, `does_not_exist`, `is_file`, `is_not_file`,
+`is_directory`, `is_not_directory`.
+
 "is a regular file" rather than "is not a directory" — the message says what the
 thing *is*, which is usually the fact that resolves the confusion.
 
@@ -123,12 +126,14 @@ Expected notes to have the text 'goodbye', but 'notes.txt' holds 'hello world'.
 Expected notes to hold 999 bytes, but 'notes.txt' holds 11 bytes.
 ```
 
-`has_text` and `contains_text` take **text, never bytes**, and accept an
-`encoding=`. Content that will not decode is a failure with a message; an unknown
-encoding name is a `LookupError` at the call.
+All three text assertions — `has_text`, `contains_text` and
+`does_not_contain_text` — take **text, never bytes**, and accept an `encoding=`
+that defaults to UTF-8. Content that will not decode fails with the codec's own
+reason and the byte that stopped it. An encoding name that does not exist raises
+`LookupError`, but only once the bytes are in hand: a missing file fails the
+assertion before the codec is ever looked up.
 
-Also: `does_not_contain_text`, `has_size_greater_than`, `has_size_less_than`,
-`is_empty`, `is_not_empty`.
+Also: `has_size_greater_than`, `has_size_less_than`, `is_empty`, `is_not_empty`.
 
 ### Directories
 
@@ -154,19 +159,22 @@ Expected Path(".") to have a child named 'missing.txt', but '.' holds ['notes.tx
 It **lists what is actually there**, which is the answer to "why isn't my file
 found" most of the time. The listing is clipped for a large directory.
 
-`does_not_have_child`, `is_not_directory` and `is_not_file` are **not**
-complements: each asserts the negative *about a path that exists*. A subject that
-is not a directory fails `does_not_have_child` outright rather than passing it
-vacuously. See the gotcha below — none of them is what you want for a path that
-is absent.
+`does_not_have_child` asserts the negative *about a directory that exists*, so a
+subject that is not a directory fails it outright rather than passing vacuously.
+It is one of [the negations that are not
+complements](#the-negated-disk-assertions-are-not-complements).
 
-`has_child` takes one entry name, never a route — assert on the child path itself
-for anything deeper.
+`has_child` takes one entry name, never a route: `"logs/app.log"`, `".."` and an
+absolute path each raise `ValueError` at the call rather than failing. Assert on
+the child path itself for anything deeper.
 
 ### Symbolic links
 
 `is_symlink`, `is_not_symlink` and `is_same_file_as` round out the set.
-`is_same_file_as` names the guilty side rather than reporting a flat mismatch.
+`is_same_file_as` asks the filesystem rather than the strings, so a hard link, a
+symbolic link and `./x` against `x` are all the same file. Two files that both
+exist and differ get a flat mismatch; when one of the two cannot be read, the
+message names which one.
 
 ## Gotchas
 
@@ -191,6 +199,35 @@ a suffix carries its leading dot, the way PurePath.suffix reports it: got 'gz', 
 Raised at the call rather than failing, because `"gz"` could never be any path's
 suffix — it is a bug in the test, and the message says what you meant.
 
+### `matches_pattern` is anchored at the right
+
+A relative pattern is matched against the *tail* of the path, so `"*.txt"` asks
+about the last component only and says nothing about the rest:
+
+```python
+from pathlib import PurePosixPath
+
+from lovely_assertions import expect, AssertionFailure
+
+log = PurePosixPath("/var/log/app.txt")
+expect(log).matches_pattern("*.txt")
+
+try:
+    expect(log).matches_pattern("/*.txt")
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected log to match the pattern '/*.txt', but '/var/log/app.txt' does not.
+```
+
+Starting the pattern with a separator anchors it at the left, as above; reach for
+`PurePath.full_match` when you want the whole path in one comparison. Case
+sensitivity follows the path's flavour — a `PureWindowsPath` matches
+case-insensitively — so pass `case_sensitive=` when the answer has to be the same
+on every machine. An empty pattern raises `ValueError`.
+
 ### `is_relative_to` is string algebra, not containment
 
 It compares path *components*, and does not resolve symlinks, `..`, or the actual
@@ -199,9 +236,13 @@ filesystem. **Never use it as a path-traversal guard.** For that you want
 
 ### The negated disk assertions are not complements
 
-A path that does not exist fails `is_file()` *and* `is_not_file()` — the second
-asserts "this is on disk and is not a regular file", which a missing path is not.
-Assert `does_not_exist()` when that is what you mean.
+`is_not_file`, `is_not_directory`, `is_not_symlink`, `is_not_empty` and
+`does_not_have_child` each assert the negative *about a path that exists*, so
+every one of them fails when nothing is there — and so does
+`does_not_contain_text`, which cannot read a file that is not there. A path that
+does not exist fails `is_file()` *and* `is_not_file()` — the second asserts
+"this is on disk and is not a regular file", which a missing path is not.
+`does_not_exist()` is the assertion that means "nothing is there".
 
 A dangling symlink is the sharp version: it fails `exists()` **and**
 `does_not_exist()`, while `is_symlink()` passes.
@@ -209,7 +250,9 @@ A dangling symlink is the sharp version: it fails `exists()` **and**
 ### The size family raises for a bad question and fails for a bad answer
 
 A **negative** size raises `ValueError` on all three — no file has one, so it is
-a bug in the test rather than a finding about the value:
+a bug in the test rather than a finding about the value. `has_size_less_than(0)`
+raises for the same reason one step along: nothing is smaller than nothing, and
+`is_empty` is the zero-byte claim.
 
 ```python
 from pathlib import Path

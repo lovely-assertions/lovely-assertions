@@ -1,5 +1,8 @@
 # Warnings
 
+Assert that a call warns — as a `with` block or on a callable — count the
+warnings it issues, and assert that nothing warned at all.
+
 Two forms, mirroring [exceptions](exceptions.md).
 
 **Context manager** — where `pytest.warns` sits:
@@ -25,7 +28,30 @@ print("warned as required")
 warned as required
 ```
 
-**Callable** — `expect(fn).warns(...)`, beside `raises`.
+**Callable** — for a thunk you already have, beside `raises`:
+
+```python
+import warnings
+
+from lovely_assertions import expect
+
+
+def legacy() -> None:
+    warnings.warn("use parse_iso instead", DeprecationWarning, stacklevel=2)
+
+
+expect(legacy).warns(DeprecationWarning).with_message_containing("parse_iso")
+print("warned as required")
+```
+
+```text
+warned as required
+```
+
+Reach for it when you already have a thunk and want the whole assertion to read
+as one expression. `expect_warns` is the primary spelling; hand `expect()` the
+function that warns and the location a failure reports moves — see the
+`stacklevel` gotcha below.
 
 ## Why this exists next to `pytest.warns`
 
@@ -33,11 +59,9 @@ Stated plainly, because the honest answer is "not for every case".
 `pytest.warns` is one line, already in the file, and needs no import. Three
 things it cannot do:
 
-**It does not show you what *was* warned.** It tells you the warning you asked
-for did not fire — which you already knew — and says nothing about the four that
-did, which is the information that ends the investigation. When the warning you
-asked for did not fire, the failure lists the warnings that *were*, each with the
-file and line its `stacklevel` pointed at:
+**It does not show you what *was* warned.** It tells you your warning did not
+fire — which you already knew. Here the failure lists the ones that did, each
+with the file and line its `stacklevel` pointed at:
 
 ```python
 import re
@@ -98,7 +122,7 @@ Expected DeprecationWarning to be warned exactly 3 times, but found 2: Deprecati
 [Counting occurrences](occurrences.md). A test that cares whether a deprecation
 fired once or once per row has no spelling for that in `pytest.warns`.
 
-## Nothing was warned
+## When the warning never fired
 
 ```python
 from lovely_assertions import expect_warns, AssertionFailure
@@ -144,10 +168,18 @@ except AssertionFailure as failure:
 Expected DeprecationWarning to have a message containing 'use parse_rfc instead', but the message was 'use parse_iso instead'.
 ```
 
-Note the subject reads as the **warning category** rather than `the value` —
-unlike an exception handle, which has no name to recover.
+In the block form the message names the **warning category**: there is no
+`expect(...)` call for a name to be read out of, and `DeprecationWarning` says
+more than `the value`, which is what an exception block falls back to. Reached
+through the callable form, the name is the callable you handed `expect()`.
 
-`with_message`, `.which` and `.where` complete the set.
+| | Asserts |
+|---|---|
+| `with_message(pattern)` | some captured warning's `str()` **matches the regex** `pattern` (a search, not a full match) |
+| `with_message_containing(text)` | some captured warning's message contains `text` |
+| `where(predicate)` | some captured warning satisfies `predicate`, which is handed the warning typed as the category you asked for |
+| `.which` | the same subject — `warns` already made the warnings the subject, so there is nothing to descend into; it exists so the chain reads aloud |
+| `.subject` | the tuple of captured warnings |
 
 ## Asserting that nothing warned
 
@@ -171,6 +203,13 @@ every time it is wanted.
 
 ## Gotchas
 
+### Your filters do not apply inside the block
+
+Capture runs with `always`, so a `DeprecationWarning` the interpreter ignores by
+default is still captured, and `-W error` does not turn the warning under test
+into an exception. A test that says "this call deprecates" should not have to
+know how the suite is configured. `pytest.warns` does the same.
+
 ### Warnings outside the category come back out
 
 A warning that is not the category you asked for is re-issued when the block
@@ -183,19 +222,22 @@ The file and line in a message are where `stacklevel` pointed, and the code that
 issued the warning chooses it — not this library.
 
 The case worth knowing: `warnings.warn(..., stacklevel=2)` names the *caller* of
-the function that warned. In the callable form that caller is this library's own
-invocation of your thunk, so the failure reports `_callable/_warning_form.py` instead of your
-test's line. It looks like a bug and is not one, and it cannot be fixed from
-here. `expect_warns` has no such frame in between and reports your block, so
-reach for the context-manager form when the location matters.
+the function that warned. Hand `expect()` that function itself and the caller is
+this library's invocation of it, so the failure points at a file inside
+`lovely_assertions` rather than at your test. It looks like a bug and is not one:
+the frame a warning names is chosen by the code that issued it. Wrapping the call
+instead — `expect(lambda: parse_date("16/03/2024"))` — puts your own line back,
+and `expect_warns` has no such frame in between at all.
 
 ### Exception messages ignore `formatting(max_chars=...)`; warning messages honour it
 
 A deliberate asymmetry. An exception's message is the primary evidence, so it is
-not subject to your display settings: it carries its own fixed ceiling and is
-elided — with a note saying how many characters were dropped — only when it is
-very long. A warning's message is ordinary rendered output and honours
-`formatting(max_chars=...)` like any other value.
+not subject to your display settings: it carries its own fixed ceiling, and past
+it the rendering is clipped with a note giving the length it had in full — not
+the number of characters dropped. That ceiling is what `max_chars` defaults to,
+so the difference only shows once you move the bound. A warning's message is
+ordinary rendered output and honours `formatting(max_chars=...)` like any other
+value.
 
 ---
 
