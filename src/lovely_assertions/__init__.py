@@ -53,7 +53,7 @@ Zero runtime dependencies, Python 3.13+, ``py.typed``.
 #: It reads ``0.0.0`` because nothing has been published to PyPI yet, and this
 #: line records the last *released* version rather than the next one. The release
 #: pull request is where the next one is proposed.
-__version__ = "0.1.0"  # x-release-please-version
+__version__ = "0.2.0"  # x-release-please-version
 
 from typing import TYPE_CHECKING, Any
 
