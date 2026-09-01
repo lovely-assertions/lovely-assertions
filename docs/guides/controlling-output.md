@@ -1,10 +1,8 @@
 # Controlling output
 
-Two different problems, two different tools:
-
-- **The message is too short.** Raise the bounds for a block with `formatting()`.
-- **The message renders your types badly.** Teach it how they read, with
-  `register_formatter()`.
+A failure message is bounded, and it renders your types with `repr`. When one is
+too short, `formatting()` raises the bounds for a block; when it renders your
+types badly, `register_formatter()` teaches it how they read.
 
 ## Bounds: `formatting()`
 
@@ -54,7 +52,7 @@ Expected audit_rows to contain 999, but was [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1
 | `max_items` | items shown from a collection |
 | `max_chars` | characters shown for one value |
 | `max_diff_lines` | lines shown in a unified diff |
-| `max_depth` | levels descended into nested structure |
+| `max_depth` | levels a difference report descends into nested structure |
 
 Exactly the assertions that were failing before still fail. The scope changes
 what a failure *says*, never whether it happens.
@@ -165,6 +163,11 @@ print(format_value(OrderBook(1, 2, 3, 4, 5)))
 OrderBook[1, 2, 3, ... (more)]
 ```
 
+That `max_items` is the formatter's own, fixed when you register it —
+`formatting(max_items=...)` does not move it. Its default matches the one
+`formatting()` starts from, so pass it only when this type has a reason to print
+differently from everything else.
+
 It claims the types you give it **and their subclasses**, not every iterable — a
 formatter that claimed every iterable would sit in front of the whole registry,
 and `repr` is the right rendering for a list of integers.
@@ -223,7 +226,11 @@ Registration is **first-come-wins**. A later registration does not displace an
 earlier one, because then a message would depend on which module happened to be
 imported first.
 
-To override a rendering for one block, pass the formatter to a soft scope:
+To override a rendering for one block, pass the formatter to a
+[soft scope](soft-assertions.md). There is no way to scope a formatter without
+the rest of that scope: failures inside are collected and reported together on
+exit rather than raising at the first one, which is why the output below opens
+with a count.
 
 ```python
 from lovely_assertions import expect, soft_assertions, AssertionFailure
@@ -260,17 +267,23 @@ outwards, and this is the only sanctioned way to change rendering per test.
 ### It never raises
 
 Formatters are user code, and user code has bugs. One that throws is skipped
-exactly as if it had declined; a value nothing claims falls back to `repr`; a
-value whose `repr` also throws is named by its type. Turning your failing test
-into an error raised inside the assertion library is the worst outcome available.
+exactly as if it had declined — and so is one that returns anything but a `str`,
+which is what a forgotten `return` looks like. Either way the next formatter is
+asked, with no error and no warning, so if a rendering did not change, check that
+`format` returns a string. A value nothing claims falls back to `repr`, and one
+whose `repr` also throws is named by its type. Turning your failing test into an
+error raised inside the assertion library is the worst outcome available.
 
 ### `format_value`
 
 The same function the library uses, exported so a formatter can render its own
 parts through the registry — which is how a list of orders gets the order
-formatter, with the nesting bound applied.
+formatter. That re-entry is bounded at a fixed depth — past it a value renders as
+`...` — and no scope moves it: `formatting(max_depth=...)` bounds a difference
+report, not this.
 
 ---
 
 **See also:** [failure messages](../concepts/failure-messages.md) ·
-[extending](extending.md) · [performance](../concepts/performance.md)
+[extending](extending.md) · [soft assertions](soft-assertions.md) ·
+[performance](../concepts/performance.md)

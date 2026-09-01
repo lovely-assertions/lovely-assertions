@@ -1,6 +1,7 @@
 # Dates and times
 
-Four subjects, for four different types:
+`date`, `datetime`, `time` and `timedelta` each get a subject of their own,
+with a vocabulary that reads as time rather than as numbers.
 
 | Value | Subject | About |
 |---|---|---|
@@ -91,12 +92,38 @@ otherwise have to work out from the date.
 `is_today`, `is_in_the_past` and `is_in_the_future` compare against the moment
 the assertion runs, and their failures state what "now" was at the time, so a
 message from a CI log is still readable weeks later. "Now" is sampled in the
-subject's own shape and timezone, so an aware subject meets an aware now — the
-alternative would raise the very `TypeError` this module exists to explain.
+subject's own shape and timezone, so an aware subject meets an aware now.
+Comparing a naive value with an aware one raises `TypeError` instead — see
+[Two mixes no type checker can refuse](#two-mixes-no-type-checker-can-refuse).
 
 A `date` subject is compared **by day**, so today is neither past nor future. A
 `datetime` subject is compared by instant, so a timestamp earlier today is
 already in the past.
+
+When the question is "the same day" rather than "today", `is_same_date_as` asks
+it of two datetimes in one call, instead of three `has_*` calls.
+
+```python
+from datetime import datetime, timedelta, timezone
+
+from lovely_assertions import expect, AssertionFailure
+
+shipped_at = datetime(2024, 3, 16, 23, 30, tzinfo=timezone.utc)
+try:
+    expect(shipped_at).is_same_date_as(
+        datetime(2024, 3, 17, 8, 30, tzinfo=timezone(timedelta(hours=9)))
+    )
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected shipped_at to fall on the same date as 2024-03-17T08:30:00+09:00, but was 2024-03-16T23:30:00+00:00.
+```
+
+Those two are the **same instant** — 23:30 UTC is 08:30 the next morning in
+Tokyo. Wall clock is compared against wall clock, neither side converted, so
+one moment in two zones is two different dates.
 
 ## Tolerance
 
@@ -147,9 +174,13 @@ Expected recorded_at to be within 0:05:00 before 2024-03-16T14:00:00, but was 20
 ```
 
 `is_within(...)` on its own asserts **nothing** — it is only half a sentence, and
-the assertion is the `.before(...)` or `.after(...)` that finishes it. You are not
-left to discover that from a test that passes for the wrong reason: an unfinished
-chain emits a `RuntimeWarning` saying so, naming the delta it was holding.
+the assertion is the `.before(...)` or `.after(...)` that finishes it. An
+unfinished chain warns rather than fails: the half-built object emits a
+`RuntimeWarning` when it is collected, naming the delta it was holding. pytest
+prints that in its warnings summary and still counts the test as passed —
+`filterwarnings = ["error"]` in your pytest configuration is what turns it red.
+`-W error::RuntimeWarning` alone will not: the warning comes from a finaliser, so
+pytest re-reports it under a warning class of its own.
 
 ## Time zones
 
@@ -197,6 +228,9 @@ asked directly
 `has_timezone` is decided by the `tzinfo` itself. A `tzinfo` whose `utcoffset()`
 returns `None` counts as naive.
 
+Comparing a naive datetime with an aware one does not fail — it raises. See
+[Two mixes no type checker can refuse](#two-mixes-no-type-checker-can-refuse).
+
 ## Durations
 
 ```python
@@ -223,18 +257,23 @@ Expected elapsed to be longer than 2:00:00, but was 1:30:00.
 Expected elapsed to have total seconds 3600, but had 5400.0 (1:30:00).
 ```
 
+`has_total_seconds` is exact float equality — note the `5400.0` in the message.
+For a duration that came out of arithmetic rather than from a literal, reach for
+`is_close_to(other, within=...)` instead.
+
 `is_longer_than` and `is_shorter_than` are **signed** comparisons, not magnitudes:
-a negative duration is shorter than a positive one. Also available:
-`is_at_least`, `is_at_most`, `is_between`, `is_zero`, `is_not_zero`,
-`is_negative`, `is_close_to`.
+a negative duration is shorter than a positive one. `expect(abs(span))` is how to
+ask about magnitude. Also available: `is_at_least`, `is_at_most`, `is_between`,
+`is_zero`, `is_not_zero`, `is_negative`, `is_close_to`.
 
 ## Wall clocks
 
-`TimeExpect` has the calendar-free half: `has_hour`, `has_minute`, `has_second`,
-`has_microsecond`, the comparisons (`is_before`, `is_after`, `is_on_or_before`,
-`is_on_or_after`, `is_between`, `is_strictly_between`, `is_not_between`),
-`is_naive`, `is_aware`,
-and one of its own:
+`has_hour`, `has_minute`, `has_second`, `has_microsecond`, `is_naive` and
+`is_aware` are the clock half, and a `datetime` has them too — that is where you
+assert the hour of a timestamp. `TimeExpect` is the clock half without the
+calendar, with the same comparisons (`is_before`, `is_after`, `is_on_or_before`,
+`is_on_or_after`, `is_between`, `is_strictly_between`, `is_not_between`), and one
+assertion of its own:
 
 ```python
 from datetime import time
@@ -257,7 +296,7 @@ the question is about the whole instant.
 
 ## Gotchas
 
-### The one mix no type checker can refuse
+### Two mixes no type checker can refuse
 
 ```python
 from datetime import date, datetime
@@ -279,16 +318,42 @@ can't compare a date with a datetime: 2024-03-16 is a date and 2024-03-17T00:00:
 is and no bound can exclude it. CPython raises `TypeError` on the comparison; the
 library catches it and rewrites it to say which side is which.
 
-Deliberately a `TypeError` and not an assertion failure: this is a bug in the
-test, not a fact about the value, and reporting it as
-`Expected invoice_date to be before ...` would send you looking in the wrong
-place. The same applies to comparing a naive datetime with an aware one.
+Only this direction is open. A `date` operand handed to a `datetime` subject *is*
+a checker error — there the operand is typed `datetime`, and a `date` is not one.
+It is the subclassing that leaves the other way round unguarded.
+
+The second mix is naive against aware, and it is the commoner crash: whether a
+datetime carries a timezone is not a type-level fact at all, so there is nothing
+for any checker to look at.
+
+```python
+from datetime import datetime, timezone
+
+from lovely_assertions import expect
+
+started_at = datetime(2024, 3, 16, 14, 30)
+try:
+    expect(started_at).is_before(datetime(2024, 3, 16, 15, 0, tzinfo=timezone.utc))
+except TypeError as error:
+    print(error)
+```
+
+```text
+can't compare a timezone-aware datetime with a naive one: 2024-03-16T14:30:00 is naive and 2024-03-16T15:00:00+00:00 is aware; give both a timezone, or neither
+```
+
+Both raise `TypeError` rather than failing the assertion, deliberately: this is a
+bug in the test, not a fact about the value, and
+`Expected started_at to be before ...` would send you looking in the wrong place.
 
 ### `has_day(32)` raises; `has_day(31)` in February fails
 
-A day number outside 1–31 could never be any date's day, so it is a bug in the
-test and raises at the call. A valid day that this date does not have is a
-finding about the value, so it fails.
+A claim no value could satisfy is a bug in the test, so it raises `ValueError` at
+the call rather than failing: a component outside its range (`has_day(32)`,
+`has_month(13)`, `has_hour(24)`), a negative tolerance (`within=`, or the delta
+handed to `is_within`), a range that admits nothing (`is_between(high, low)`,
+`is_strictly_between(x, x)`). A claim that is possible but untrue — `has_day(31)`
+on a February date — is a finding about the value, so it fails.
 
 ---
 

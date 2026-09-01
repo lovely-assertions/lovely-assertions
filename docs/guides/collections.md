@@ -1,9 +1,12 @@
 # Collections
 
-`expect(some_collection)` gives you a `CollectionExpect` for a container that is
-neither a mapping nor a sequence — a `set`, a `frozenset`, a `dict` view. Lists
-and tuples get a [`SequenceExpect`](sequences.md), which **inherits everything on
-this page** and adds its own on top.
+Assertions for any container — membership, length, uniqueness, set relations, and
+claims about every item. `expect(a_set)` gives you a `CollectionExpect`.
+
+That subject covers a container that is neither a mapping nor a sequence — a
+`set`, a `frozenset`, a `dict` view. Lists and tuples get a
+[`SequenceExpect`](sequences.md), which **inherits everything on this page** and
+adds its own on top.
 
 A `dict` gets a [`MappingExpect`](mappings.md), and that one is deliberately
 *not* a `CollectionExpect`: a mapping is a collection of its keys, its values or
@@ -49,8 +52,8 @@ failed. The family:
 | `does_not_contain_all(a, b, ...)` | they are not *all* there — at least one is missing |
 | `contains_single()` | there is exactly one item |
 
-On a **sequence** the negative ones say *where* the offender was — a set has no
-positions, so there it says only that the item was found:
+On a **sequence**, `does_not_contain` says *where* it found the item — a set has
+no positions, so over one the message says only that the item was present:
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -118,9 +121,12 @@ The whole family: `has_length`, `does_not_have_length`,
 `is_empty`, `is_not_empty`.
 
 `is_none_or_empty` and `is_not_none_or_empty` accept a container that is `None`
-without a separate check first. Note that you reach them through a variable
-*typed* as optional — `expect(None)` on its own dispatches to the plain
-`Expect`, which has no collection catalogue at all.
+without a separate check first. You reach them from a variable typed as a
+*collection*, not as an optional one — `expect(maybe)` on a `list[str] | None`
+dispatches to the plain `Expect`, which has no collection catalogue at all — so a
+checker will say the `None` half can never happen. It happens anyway: a `None`
+arrives through a cast, from untyped code, or from a fixture that returned
+nothing, and absorbing exactly that is what the pair is for.
 
 ## Uniqueness
 
@@ -138,8 +144,8 @@ except AssertionFailure as failure:
 Expected order_ids to have unique items, but 'ord-118' appeared again at index 2: ['ord-118', 'ord-119', 'ord-118'].
 ```
 
-It names the repeated value *and* where the repeat was, which is the pair you
-need. `has_unique_items` is a synonym, for when it reads better.
+It names the repeated value, and — on a sequence — where the repeat was.
+`has_unique_items` is a synonym, for when it reads better.
 
 Both take a **`key=`** selector, for uniqueness on a field rather than on the
 whole item:
@@ -164,7 +170,8 @@ a field is the common case.
 
 ## Asserting about every item
 
-Four ways, for four different questions.
+Which one to reach for depends on whether the claim is about a type, a value, a
+condition, or nested assertions.
 
 **`all_are_instance_of`** — every item is of a type:
 
@@ -182,7 +189,7 @@ except AssertionFailure as failure:
 Expected parsed_row to contain only instances of int, but 'x' at index 1 was str.
 ```
 
-**`all_equal_to`** and **`contains_only`** — every item is one value:
+**`all_equal_to`** — every item is the same one value:
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -276,6 +283,28 @@ Expected order_ids to contain an item matching the predicate, but checked 2 item
 `contains_single_matching` additionally requires that exactly one item matches,
 and `does_not_contain_matching` is the complement.
 
+`contains_matching` and `contains_single_matching` hand the matched item
+back, so the chain continues on it with `.which` — find the row, then assert
+about it, in one statement:
+
+```python
+from lovely_assertions import expect
+
+order_ids = ["ord-118", "ord-119"]
+expect(order_ids).contains_single_matching(lambda value: value.endswith("119")).which.is_equal_to(
+    "ord-119"
+)
+```
+
+Reach for `contains_single_matching` when that continuation has to be
+unambiguous: `contains_matching` hands back whichever item came first in
+iteration order, and a `set` has no order worth relying on.
+
+That continuation is statically a plain `Expect` over the element type:
+`.which.starts_with(...)` on a collection of strings is a type error, even though
+the object at runtime is a `StringExpect`. Hand `.subject` to `expect()` where
+you want the element's own catalogue.
+
 `contains_match` and `does_not_contain_match` are the same idea for a **wildcard**
 pattern (`*` and `?`) against string items — the same dialect as
 [`matches_wildcard`](strings.md#patterns), not a regular expression. They are
@@ -317,7 +346,11 @@ that instead.
 ## Asserting on a field of every item
 
 `extracting` transforms the collection into one of a chosen field, and hands you
-a subject over that:
+a subject over that — a `CollectionExpect`, even though the extraction
+materialises a list. The order of that list is the *source's* iteration order,
+which for a `set` is hash order, so `is_sorted` is not offered on the result. A
+sequence keeps its ordered catalogue instead; see
+[Extracting stays a sequence](sequences.md#extracting-stays-a-sequence).
 
 ```python
 from dataclasses import dataclass
@@ -373,11 +406,12 @@ print("matched in any order")
 matched in any order
 ```
 
-It takes **predicates**, not inspectors, and the pairing is one-to-one: each
-predicate must claim a *distinct* item. That matters — with items `[1, 2]` and
-predicates `is_one_or_two, is_one`, matching each predicate independently would
-pass, and it would be wrong, because `is_one_or_two` has taken the only item
-`is_one` can use. The assignment is solved as a matching instead.
+It takes **predicates**, not inspectors, and the pairing is one-to-one and
+total: each predicate must claim a *distinct* item, and there have to be exactly
+as many items as predicates. That matters — with items `[1, 2]` and predicates
+`is_one_or_two, is_one`, matching each predicate independently would pass, and it
+would be wrong, because `is_one_or_two` has taken the only item `is_one` can use.
+The assignment is solved as a matching instead.
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -394,6 +428,25 @@ except AssertionFailure as failure:
 
 ```text
 Expected scopes to satisfy every predicate in any order, but no unclaimed item matched the predicate (predicate 2): ['write', 'read'].
+```
+
+A surplus item fails before any pairing is attempted, with its own message:
+
+```python
+from lovely_assertions import expect, AssertionFailure
+
+scopes = ["write", "read", "admin"]
+try:
+    expect(scopes).satisfies_in_any_order(
+        lambda scope: scope == "read",
+        lambda scope: scope == "write",
+    )
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected scopes to have one item for each of the 2 predicates, but had 3: ['write', 'read', 'admin'].
 ```
 
 For a sequence where order *is* the point, see
@@ -417,9 +470,8 @@ except TypeError as error:
 the callback returned True instead of asserting anything, so this would have passed whatever the subject was. An inspector asserts; a predicate returns a verdict. use `only_contains` to pass a predicate, or assert instead: `lambda it: expect(it).is_positive()`
 ```
 
-An inspector that quietly returned a boolean would make the assertion pass
-whatever the collection held — a test that can never fail and never says so. It
-is caught at the call, and the message tells you both fixes.
+The guard fires per item, so an empty collection still passes — the callback is
+never called, and there is nothing to catch.
 
 ### `contains_only` is not `only_contains`
 

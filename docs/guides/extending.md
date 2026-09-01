@@ -1,9 +1,7 @@
 # Extending
 
-Your domain has assertions this library cannot have: `is_shippable`,
-`is_settled`, `has_valid_signature`. Write them, and they get subject naming,
-soft scopes, `because=` and the whole inherited catalogue — the same machinery
-the built-in assertions use, because it *is* the same machinery.
+Write the assertions your domain needs — `is_shippable`, `is_settled`,
+`has_valid_signature` — as methods on a subject of your own.
 
 ## A subject of your own
 
@@ -18,9 +16,6 @@ class Money:
 
     def __init__(self, cents: int) -> None:
         self.cents = cents
-
-    def __repr__(self) -> str:
-        return f"Money({self.cents})"
 
 
 class MoneyExpect(Expect[Money]):
@@ -38,42 +33,7 @@ try:
     expect(refund, as_=MoneyExpect).is_positive()
 except AssertionFailure as failure:
     print(failure)
-```
 
-```text
-Expected refund to be positive, but was -50 cents.
-```
-
-Note what you did not have to write: the word `Expected`, the subject's name, the
-full stop. Those are added in one place, which is what makes everything below
-work for your assertion without you wiring any of it up.
-
-And `because=` already works:
-
-```python
-from typing import Self
-
-from lovely_assertions import Expect, custom_assertion, expect, AssertionFailure
-
-
-class Money:
-    __slots__ = ("cents",)
-
-    def __init__(self, cents: int) -> None:
-        self.cents = cents
-
-
-class MoneyExpect(Expect[Money]):
-    __slots__ = ()
-
-    @custom_assertion
-    def is_positive(self, *, because: str = "") -> Self:
-        if self._subject.cents > 0:
-            return self
-        return self._fail(f"to be positive, but was {self._subject.cents} cents", because)
-
-
-refund = Money(-50)
 try:
     expect(refund, as_=MoneyExpect).is_positive(because="refunds are stored positive")
 except AssertionFailure as failure:
@@ -81,8 +41,14 @@ except AssertionFailure as failure:
 ```
 
 ```text
+Expected refund to be positive, but was -50 cents.
 Expected refund to be positive, but was -50 cents because refunds are stored positive.
 ```
+
+Note what you did not have to write: the word `Expected`, the subject's name, the
+full stop, and the joining of `because=` onto the end. Those are added in one
+place, which is what makes everything below work for your assertion without you
+wiring any of it up.
 
 ## The five rules
 
@@ -90,9 +56,9 @@ Expected refund to be positive, but was -50 cents because refunds are stored pos
 attribute and is allocated once per assertion; a `__dict__` on each one is
 measurable across a real suite.
 
-**2. Decorate every assertion with `@custom_assertion`.** Without it, your
-method's own frame is taken for the caller's, and the message names a local of
-yours instead of the variable the test asserted on:
+**2. Decorate every assertion with `@custom_assertion`.** Without it, name
+recovery reads your own method's frame instead of the caller's, finds no
+`expect(...)` in it, and gives up on the name:
 
 ```python
 from typing import Self
@@ -209,12 +175,21 @@ checker still reads the declared overload set and says `Expect[Money]`, so
 the language rather than an oversight — no checker can see a runtime
 registration — and it is why `as_=` exists.
 
+Matching is by exact type. A subclass of `Money` is a different type, so it falls
+through to the plain `Expect` and `is_positive` on it is an `AttributeError` at
+runtime: register each type you mean to reach, or use `as_=`.
+
 Use `register()` when the values arrive from somewhere the annotations do not
 reach, and `as_=` when you want the checking.
 
-### Registration is refused twice over
+### What `register()` refuses
 
-<!-- docs-test: expect-error - registering over a built-in, refused by the checker as well as at runtime -->
+A type cannot be registered twice, and a type that already has a subject cannot
+be registered over. Both raise `ValueError`, and only at runtime — a checker
+reads the two arguments against `register`'s signature and nothing more, so
+registering your own `Expect[str]` over `str` type-checks and then raises.
+
+<!-- docs-test: expect-error - the checker objects that MoneyExpect takes a Money and not a str, which would fire for any type; the clash with the built-in subject is caught at runtime alone -->
 
 ```python
 from lovely_assertions import Expect, register
@@ -293,6 +268,13 @@ print("found, then continued")
 ```text
 found, then continued
 ```
+
+Quote the return annotation. `Found`'s third parameter defaults to `Expect[V]`,
+a name the library imports for type checking only, so an unquoted
+`Found[Self, int]` raises `NameError` when the annotation is evaluated — on
+Python 3.13 while the class body still runs, on 3.14 whenever something reads
+`__annotations__`.
+`Found[Self, str, StringExpect]`, with all three supplied, needs no quotes.
 
 Use `_fail_narrowing` rather than `_fail` on an assertion that was supposed to
 produce a narrowed subject: there is no narrowed subject to return, so a soft
