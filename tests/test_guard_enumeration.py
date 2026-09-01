@@ -58,10 +58,22 @@ NOT_THE_PACKAGE: Final = frozenset(
 #: The lists the guards build, by the expression a reader would go and look at.
 #: Parametrised rather than asserted together, so a failure names the guard that
 #: lost a file instead of the fact that one of them did.
+#:
+#: Each list is turned into module *names* before it is compared, and each is
+#: relativised against the root it was walked from rather than against :data:`SRC`.
+#: Those roots are not always the same directory: this file and
+#: ``test_docstring_examples`` reach the package through
+#: ``lovely_assertions.__file__``, while ``test_source_conventions`` reads the
+#: shipped text out of ``src/`` on purpose. In a checkout the two resolve to one
+#: directory and the difference is invisible; installed from a wheel they do not,
+#: and relativising one against the other raises rather than comparing.
 GUARD_LISTS: Final = {
     "test_docstring_examples.MODULES": lambda: set(test_docstring_examples.MODULES),
     "test_source_conventions.MODULES": (
-        lambda: {module_name(path, SRC) for path in test_source_conventions.MODULES}
+        lambda: {
+            module_name(path, test_source_conventions.SRC)
+            for path in test_source_conventions.MODULES
+        }
     ),
     "_happy_calls.library_modules()": lambda: {module.__name__ for module in library_modules()},
 }
