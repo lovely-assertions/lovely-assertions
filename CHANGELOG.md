@@ -9,6 +9,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [git-cliff](https://git-cliff.org). Don't edit it -- write the commit message,
 which a CI gate already requires to be a Conventional Commit.
 
+## [0.2.0](https://github.com/lovely-assertions/lovely-assertions/compare/v0.1.0...v0.2.0) (2026-09-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **license:** the Mozilla Public License 2.0, from 0.2.0 on ([#30](https://github.com/lovely-assertions/lovely-assertions/issues/30))
+
+### Features
+
+* **license:** the Mozilla Public License 2.0, from 0.2.0 on ([#30](https://github.com/lovely-assertions/lovely-assertions/issues/30)) ([93b5462](https://github.com/lovely-assertions/lovely-assertions/commit/93b54621a495f16079c21aa147eb0d835d3e1613))
+
+
+### Performance
+
+* **imports:** load a subject the first time a value needs one, not at import ([#21](https://github.com/lovely-assertions/lovely-assertions/issues/21)) ([2523965](https://github.com/lovely-assertions/lovely-assertions/commit/2523965f97da5af64ab14f3583dfd1a4b3355466))
+
+
+### Documentation
+
+* **concepts:** correct what the design pages claim about the library ([#34](https://github.com/lovely-assertions/lovely-assertions/issues/34)) ([d0cd564](https://github.com/lovely-assertions/lovely-assertions/commit/d0cd564e6c2b53ce4819e1bdf7145451f5bc587f))
+* **contributing:** state the terms a contribution arrives under ([#29](https://github.com/lovely-assertions/lovely-assertions/issues/29)) ([a5b9687](https://github.com/lovely-assertions/lovely-assertions/commit/a5b96877855d23ce01bd283864a38a1ed187ce68))
+* **getting-started:** correct the entry path, and give two pages an opening ([#33](https://github.com/lovely-assertions/lovely-assertions/issues/33)) ([682ccd0](https://github.com/lovely-assertions/lovely-assertions/commit/682ccd0a327dbffc3d82b56b29018fcec4752259))
+* give each repeated lesson one owner, and define the words the tree relies on ([#38](https://github.com/lovely-assertions/lovely-assertions/issues/38)) ([adff86e](https://github.com/lovely-assertions/lovely-assertions/commit/adff86eba435a46b20139a43186a2162ad6ec687))
+* **guides:** correct the last seven guides, and state the halves that fail silently ([#37](https://github.com/lovely-assertions/lovely-assertions/issues/37)) ([802546d](https://github.com/lovely-assertions/lovely-assertions/commit/802546d215786dd2130db8bab74f3ccf7c298f40))
+* **guides:** correct the translation tables, and the Jest claim the source made too ([#36](https://github.com/lovely-assertions/lovely-assertions/issues/36)) ([24e297d](https://github.com/lovely-assertions/lovely-assertions/commit/24e297df043187661782b124df9ceb0630c27fcd))
+* **internal:** the guidance describes the tree it is guidance for ([#28](https://github.com/lovely-assertions/lovely-assertions/issues/28)) ([5e0e265](https://github.com/lovely-assertions/lovely-assertions/commit/5e0e2652d9004aa90a82a5834039e48bccf1015f))
+* **readme:** keep the logo out of the documentation corpus, and restore the H1 ([#32](https://github.com/lovely-assertions/lovely-assertions/issues/32)) ([a174a60](https://github.com/lovely-assertions/lovely-assertions/commit/a174a6067193d25304a4f73c52a1aaeda0424127))
+* **readme:** the logo, five fewer paragraphs, and badges that report something ([#31](https://github.com/lovely-assertions/lovely-assertions/issues/31)) ([8d2af02](https://github.com/lovely-assertions/lovely-assertions/commit/8d2af02127279816d4498dd5f5d352b65332f513))
+
+
+### Refactoring
+
+* **callable:** three families, split by what each one is asked ([#20](https://github.com/lovely-assertions/lovely-assertions/issues/20)) ([0d6b90b](https://github.com/lovely-assertions/lovely-assertions/commit/0d6b90bfecaab401e0000ca57588113ac1a4d22a))
+* **collection:** one file per seam, over a shared root ([#16](https://github.com/lovely-assertions/lovely-assertions/issues/16)) ([4b282e3](https://github.com/lovely-assertions/lovely-assertions/commit/4b282e323b6ce4fa808cd4c89897167070328bc4))
+* **core:** assemble the subject from one mixin per seam ([#14](https://github.com/lovely-assertions/lovely-assertions/issues/14)) ([194bbea](https://github.com/lovely-assertions/lovely-assertions/commit/194bbeaaa060a1efdc3388205a9eeff90a48546c))
+* **datetime:** the seams are the classes, made into files ([#19](https://github.com/lovely-assertions/lovely-assertions/issues/19)) ([77cafdc](https://github.com/lovely-assertions/lovely-assertions/commit/77cafdc6513c5a5312556ae8302ea346e3208cc2))
+* **diff:** one file per kind of thing being compared ([#10](https://github.com/lovely-assertions/lovely-assertions/issues/10)) ([443efb5](https://github.com/lovely-assertions/lovely-assertions/commit/443efb5300dfee6190e7197133beb4829120c1fd))
+* **enum:** three families of question, and the helpers behind them ([#25](https://github.com/lovely-assertions/lovely-assertions/issues/25)) ([668292d](https://github.com/lovely-assertions/lovely-assertions/commit/668292d2c2724d455e00496e371a987d2d0a7bea))
+* **equivalence:** one file per question the engine has to answer ([#22](https://github.com/lovely-assertions/lovely-assertions/issues/22)) ([92dbf2e](https://github.com/lovely-assertions/lovely-assertions/commit/92dbf2ef24827073f7448dfaf59fb47c5b357c03))
+* **formatting:** separate the registries, the limits and the scope ([#12](https://github.com/lovely-assertions/lovely-assertions/issues/12)) ([0976a68](https://github.com/lovely-assertions/lovely-assertions/commit/0976a68b9b4293c88f49fd7a62fb42b48c9a612f))
+* **matching:** one file per placeholder, and the naming halves apart ([#13](https://github.com/lovely-assertions/lovely-assertions/issues/13)) ([605bc90](https://github.com/lovely-assertions/lovely-assertions/commit/605bc9051f36705bdce30ac59570a00ab146093a))
+* **occurrence:** the protocol, the constraints, and the words for them ([#26](https://github.com/lovely-assertions/lovely-assertions/issues/26)) ([d7c009b](https://github.com/lovely-assertions/lovely-assertions/commit/d7c009b7df5424c9c01fe40f265f9e2f96f29343))
+* **ordered:** the protocol, the words, and three families of comparison ([#27](https://github.com/lovely-assertions/lovely-assertions/issues/27)) ([479f573](https://github.com/lovely-assertions/lovely-assertions/commit/479f573514166de5df84a675b2fd9666396e6dae))
+* **path:** two subjects, split by whether the disk is asked ([#18](https://github.com/lovely-assertions/lovely-assertions/issues/18)) ([4641808](https://github.com/lovely-assertions/lovely-assertions/commit/4641808c5dc3097bf9506299f75a77340d6bf160))
+* **reflection:** split the leaves by the question they answer ([#11](https://github.com/lovely-assertions/lovely-assertions/issues/11)) ([decf57f](https://github.com/lovely-assertions/lovely-assertions/commit/decf57f69a4fc4b1332446f7f02cf176136f6b57))
+* **sequence:** split the two subjects that inherit a catalogue ([#17](https://github.com/lovely-assertions/lovely-assertions/issues/17)) ([ddcebb3](https://github.com/lovely-assertions/lovely-assertions/commit/ddcebb33853aa0bb37491f7b09f92506410fb2b6))
+* **string:** one file per seam of the widest catalogue ([#15](https://github.com/lovely-assertions/lovely-assertions/issues/15)) ([5624f33](https://github.com/lovely-assertions/lovely-assertions/commit/5624f332d7a20aed059f84da9b3f64e168c4e93b))
+* **type:** four families of question, and the helpers behind them ([#23](https://github.com/lovely-assertions/lovely-assertions/issues/23)) ([e68a4c4](https://github.com/lovely-assertions/lovely-assertions/commit/e68a4c4f6046025ed165f1629fdd631fc482ffd7))
+
+
+### Tests
+
+* **guards:** walk the package once, so a subpackage cannot blind a rule ([#8](https://github.com/lovely-assertions/lovely-assertions/issues/8)) ([024fcd4](https://github.com/lovely-assertions/lovely-assertions/commit/024fcd47fd8a042c9566598edc45bc32001a0bad))
+
 ## 0.1.0 (2026-08-30)
 
 
