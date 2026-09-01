@@ -5,11 +5,20 @@ comparison; a failing one has to end an investigation.
 
 ## The shape of a message
 
-Most failures are one sentence with three parts:
+Most failures are one sentence, assembled from one template:
 
 ```
-Expected <the value> to <what should have been true>, but <what was there instead>.
+Expected {subject} {expectation}[ because {reason}].
+[optional detail block]
 ```
+
+Two parts are always there: the **subject** names the value, and the
+**expectation** says what was required of it and what was there instead. Two are
+optional: the reason you passed as `because=`, and a detail block under the
+sentence when there is more to say than the two values. The rest of this page is
+those four in use;
+[Failure messages](../concepts/failure-messages.md#the-grammar) is the grammar
+behind them.
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -25,6 +34,7 @@ except AssertionFailure as failure:
 Expected user_age to be greater than 18, but was 15.
 ```
 
+`user_age` is the subject, `to be greater than 18, but was 15` the expectation.
 Three facts, none of which you have to go and look up: *which* value, what was
 required of it, and what it actually held.
 
@@ -37,8 +47,7 @@ pytest never rewrote.
 Not every failure is that sentence. The `but` half is absent where there is
 nothing to contrast — an inspection reports the failures nested inside it
 instead — and a [soft scope](../guides/soft-assertions.md) prints a numbered list
-rather than a sentence. [Failure messages](../concepts/failure-messages.md) has
-the full grammar, including the two optional parts the rest of this page adds.
+rather than a sentence.
 
 ## Where the name comes from
 
@@ -141,8 +150,8 @@ the failure path of your own code.
 ## Composite values get a difference
 
 When there is more to say than the two values themselves, the sentence is
-followed by an indented block pinning the difference down. How far it can pin it
-depends on what the values are.
+followed by an indented detail block pinning the difference down. How far it can
+pin it depends on what the values are.
 
 **A mapping** names the key:
 
@@ -242,33 +251,11 @@ side by side, and a second line would only repeat them.
 
 ## Messages stay a readable size
 
-Every rendering is bounded. A collection prints its first few items and counts
-the rest; one value prints about a terminal line; a diff prints a screenful. So
-comparing two five-thousand-element lists gives you a few hundred characters, not
-sixty thousand — the message stays skimmable, which is what you need when you are
-working out *which* assertion broke.
-
-The default shows ten items. When you are past skimming and debugging the value
-itself, that is exactly wrong, so you raise it for a block:
-
-```python
-from lovely_assertions import expect, formatting, AssertionFailure
-
-rows = list(range(60))
-try:
-    with formatting(max_items=25):
-        expect(rows).contains(999)
-except AssertionFailure as failure:
-    print(failure)
-```
-
-```text
-Expected rows to contain 999, but was [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, ... (35 more)].
-```
-
-[Controlling output](../guides/controlling-output.md) covers the full set of
-bounds, and how to teach a message to render your own domain types instead of
-falling back to `repr`.
+Every rendering is bounded, so even a huge value leaves you a message you can
+skim — which is what you need when you are working out *which* assertion broke.
+[Controlling output](../guides/controlling-output.md) has what the bounds are,
+how to raise them for a block when you are past skimming, and how to teach a
+message to render your own domain types instead of falling back to `repr`.
 
 ## Failures are ordinary `AssertionError`s
 

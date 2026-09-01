@@ -1,7 +1,8 @@
 # Counting occurrences
 
 Several assertions take an `occurrences=` constraint, which turns *is it there*
-into *is it there the right number of times*:
+into *is it there the right number of times*. You build the constraint with
+`exactly`, `at_least`, `at_most` and their neighbours, and pass it in.
 
 ```python
 from lovely_assertions import expect, exactly

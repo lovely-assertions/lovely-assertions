@@ -8,7 +8,7 @@ types badly, `register_formatter()` teaches it how they read.
 
 Every rendering in the library is capped. A collection prints its first few items
 and counts the rest; one value prints about a terminal line; a diff prints a
-screenful.
+screenful; a difference report descends a couple of levels into nested structure.
 
 ```python
 from lovely_assertions import expect, AssertionFailure

@@ -1,68 +1,13 @@
 # Type-checker divergences
 
-Where pyright and mypy disagree about this library, what is suppressed in the
-shipped source, and the decision behind each one.
+pyright and mypy both work on this library. One of them is occasionally less
+precise, and every place that is true is written down on this page.
 
 pyright is the reference checker. mypy is run alongside it, both at their
 strictest settings, and both are required green before anything is committed.
-
 Where the two genuinely disagree, the API keeps the shape pyright can express and
-the disagreement is written down here. **The API is never shaved down to make a
+the disagreement is recorded here. **The API is never shaved down to make a
 checker happy** — that would trade the library's actual value for a green tick.
-
-This page is also a ledger with teeth:
-
-- a test fails if the source uses a suppression code that has no entry below, and
-  fails on any bare `# type: ignore` or `# pyright: ignore` with no rule code;
-- pyright runs with `reportUnnecessaryTypeIgnoreComment` as an error, and mypy
-  with `warn_unused_ignores`, so an entry cannot outlive the divergence it
-  covers — the suppression starts failing the build the day the checker improves;
-- pyright runs with `enableTypeIgnoreComments` off, so a `# type: ignore` written
-  for mypy can never silence pyright by accident. Each checker is suppressed only
-  by its own syntax.
-
-Nothing here changes what the library *does*. If you are reading it to decide
-whether to adopt the package, the summary is: both checkers work, one of them is
-occasionally less precise, and every place that is true is listed below.
-
----
-
-## Suppressions in the shipped source
-
-Three codes, and that is the whole list.
-
-### `overload-overlap` (mypy) / `reportOverlappingOverload` (pyright)
-
-**Where:** three `expect()` overloads — `bool`, `str` and `Mapping`.
-
-**Why it fires:** `bool` is a subclass of `int`, `str` is a `Sequence[str]`, and
-a `Mapping` is a `Collection` of its keys. Each of the three therefore shadows
-part of a later overload with a different return type, which is exactly the
-pattern these rules exist to warn about.
-
-**Why it stays:** first-match-wins ordering *is* the dispatch contract.
-`expect(True)` must be a `BoolExpect` and not a `NumericExpect`; `expect("x")`
-must be a `StringExpect` and not a `SequenceExpect[str]`. The overlap is the
-mechanism, so each checker that reports it is told per line that it is intended:
-the `bool` and `str` overloads carry both suppressions, while the `Mapping` one
-carries mypy's alone — pyright does not report that pair, and adding its
-suppression there would fail the build, since `reportUnnecessaryTypeIgnoreComment`
-is an error here. The runtime dispatch walks the identical order, and that table is
-pinned twice: statically in `typing_tests/positive/dispatch.py`, at runtime in
-`tests/test_narrowing.py`. Nothing compares the two lists, so keeping them in
-step is discipline rather than a guard. See [Typed dispatch](typed-dispatch.md).
-
-### `reportPrivateUsage` (pyright)
-
-**Where:** three call sites. One reads `sys._getframe`, which is underscored but
-is the documented, allocation-free way to walk the stack — `inspect.currentframe`
-is a thin wrapper that would drag the whole `inspect` module in on the first
-failure for no gain. The other two report a continuation's failure through the
-subject it came from, so the message carries that subject's name rather than the
-continuation's.
-
-**Why they stay:** each is deliberate, each is internal to the package, and none
-reaches anything a user can see.
 
 ---
 
@@ -140,45 +85,6 @@ print("rebound")
 rebound
 ```
 
-### `.subject` on a sequence returns `Sequence[E]`, not `list[E]`
-
-One subject class covers lists, tuples and every other sequence, which is what
-makes the catalogue work at all. The cost is that `.subject` hands back the
-abstract type. The element type — the part carrying the information — survives
-intact.
-
-### An enum member is an enum before it is anything else
-
-An `IntEnum` member really is an `int` and a `StrEnum` member really is a `str`,
-so the dispatch could route them to `NumericExpect` and `StringExpect`. It does
-not: every enum member gets `EnumExpect`.
-
-The alternative — plain enums here, mixin enums with their mixin's catalogue —
-makes the subject depend on a choice the enum's *author* made, which nobody
-reading a test can be expected to hold in their head. It would also put
-`has_name` and `has_value` out of reach on exactly the enums people write most.
-
-The cost is paid where it is cheapest: `is_greater_than` on an `IntEnum` member
-is a checker error rather than a runtime surprise. `is_equal_to`, `is_in` and
-`is_one_of` live on the generic subject and still work, and
-`expect(level.value)` asks for the mixin's catalogue in one unambiguous move.
-
-### `date` and `datetime` cannot be kept apart by the type system
-
-`datetime` subclasses `date`, so a `datetime` is assignable everywhere a `date`
-is — and *ordering* the two raises `TypeError` in CPython, while `==` quietly
-answers `False`. No bound can exclude a subtype, and the same hole exists for
-naive versus aware datetimes, which the type system cannot see at all.
-
-So the assertions that order the two, or measure the distance between them,
-catch both and raise a `TypeError` naming which side is which. That is
-deliberately *not* an assertion failure: neither is a fact about the value under
-test, both are bugs in the test itself, and reporting them as
-`Expected deadline to be before ...` would send you looking in the wrong place.
-`is_equal_to` is left alone, because `==` across the pair is well defined: a
-`date` that is not the `datetime` you expected is an ordinary failure, and the
-message prints both reprs so the mix is visible in it.
-
 ### `Found`'s third parameter is a promise, not a proof
 
 `Found[P, V, A]` lets an assertion say what `.which` hands back, and `A` is not
@@ -196,6 +102,71 @@ are, and they cannot be reused as a constraint. So it stays a promise the
 producer makes, and every producer inside the library is a pinned typed
 assertion. If you [write your own](../guides/extending.md), this is your
 responsibility.
+
+### Decided in the guide that shows it
+
+Three trades of the same kind are argued where they can be demonstrated, on the
+page that owns the assertion:
+
+| The trade | Argued in |
+|---|---|
+| `.subject` on a sequence hands back `Sequence[E]`, not `list[E]` — one subject class covers lists, tuples and everything else with an order, and the element type survives | [Chaining and narrowing](../getting-started/chaining-and-narrowing.md#subject-on-a-list-gives-you-a-sequence) |
+| An enum member is an enum before it is anything else, so an `IntEnum` member gets `EnumExpect` rather than `NumericExpect` | [Types and enums](../guides/types-and-enums.md#intenum-and-strenum-members) |
+| `date` and `datetime` cannot be kept apart by the type system, so the assertions that order them raise `TypeError` instead of failing | [Dates and times](../guides/dates-and-times.md#two-mixes-no-type-checker-can-refuse) |
+
+---
+
+## For contributors: the suppression ledger
+
+Nothing past this heading affects using the library. It is the record of every
+type-checker suppression in the shipped source, and it lives here because a test
+reads it: a suppression code used in `src/` with no entry below fails the build.
+
+The ledger has teeth in the other direction too:
+
+- pyright runs with `reportUnnecessaryTypeIgnoreComment` as an error, and mypy
+  with `warn_unused_ignores`, so an entry cannot outlive the divergence it
+  covers — the suppression starts failing the build the day the checker improves;
+- pyright runs with `enableTypeIgnoreComments` off, so a `# type: ignore` written
+  for mypy can never silence pyright by accident. Each checker is suppressed only
+  by its own syntax;
+- a bare `# type: ignore` or `# pyright: ignore` with no rule code fails a test
+  beside it, because it silences whatever happens to be on the line.
+
+Three codes, and that is the whole list.
+
+### `overload-overlap` (mypy) / `reportOverlappingOverload` (pyright)
+
+**Where:** three `expect()` overloads — `bool`, `str` and `Mapping`.
+
+**Why it fires:** `bool` is a subclass of `int`, `str` is a `Sequence[str]`, and
+a `Mapping` is a `Collection` of its keys. Each of the three therefore shadows
+part of a later overload with a different return type, which is exactly the
+pattern these rules exist to warn about.
+
+**Why it stays:** first-match-wins ordering *is* the dispatch contract.
+`expect(True)` must be a `BoolExpect` and not a `NumericExpect`; `expect("x")`
+must be a `StringExpect` and not a `SequenceExpect[str]`. The overlap is the
+mechanism, so each checker that reports it is told per line that it is intended:
+the `bool` and `str` overloads carry both suppressions, while the `Mapping` one
+carries mypy's alone — pyright does not report that pair, and adding its
+suppression there would fail the build, since `reportUnnecessaryTypeIgnoreComment`
+is an error here. The runtime dispatch walks the identical order, and that table is
+pinned twice: statically in `typing_tests/positive/dispatch.py`, at runtime in
+`tests/test_narrowing.py`. Nothing compares the two lists, so keeping them in
+step is discipline rather than a guard. See [Typed dispatch](typed-dispatch.md).
+
+### `reportPrivateUsage` (pyright)
+
+**Where:** three call sites. One reads `sys._getframe`, which is underscored but
+is the documented, allocation-free way to walk the stack — `inspect.currentframe`
+is a thin wrapper that would drag the whole `inspect` module in on the first
+failure for no gain. The other two report a continuation's failure through the
+subject it came from, so the message carries that subject's name rather than the
+continuation's.
+
+**Why they stay:** each is deliberate, each is internal to the package, and none
+reaches anything a user can see.
 
 ---
 

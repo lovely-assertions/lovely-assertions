@@ -134,10 +134,9 @@ orders = [{"id": "ord-118"}, {"id": "ord-119"}]
 expect(orders).extracting(lambda order: order["id"]).contains("ord-118")
 ```
 
-`extracting("id")` cannot be typed: a checker cannot know the attribute exists,
-let alone its type, so every assertion downstream would be checked against `Any`
-— an empty autocomplete list and a type error that never fires. The callable also
-survives a rename.
+`extracting("id")` cannot be typed;
+[collections](collections.md#asserting-on-a-field-of-every-item) has the
+reasoning and the rest of the assertion.
 
 **The catalogue is per type.** `expect(3).starts_with(...)` is caught by your
 type checker before you run anything, because a `NumericExpect` has no such

@@ -11,7 +11,10 @@ expect(the value under test).what_should_be_true(the expectation)
 
 `expect()` wraps the value in a **subject** — an object carrying the assertions
 that make sense for that value. The subject is chosen from the value's type, so
-you never look for a method that could not apply.
+you never look for a method that could not apply. Everywhere in these pages,
+*subject* means that wrapper, with one collision worth meeting early: the member
+`.subject` goes the other way, handing back the wrapped value rather than the
+wrapper.
 
 ## The shape, five times
 

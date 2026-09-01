@@ -3,6 +3,8 @@
 Assert that a call warns — as a `with` block or on a callable — count the
 warnings it issues, and assert that nothing warned at all.
 
+> Full signatures: [`WarnedExpect[W]`](../reference/assertions.md#warnedexpectw).
+
 Two forms, mirroring [exceptions](exceptions.md).
 
 **Context manager** — where `pytest.warns` sits:

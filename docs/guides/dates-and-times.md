@@ -3,6 +3,11 @@
 `date`, `datetime`, `time` and `timedelta` each get a subject of their own,
 with a vocabulary that reads as time rather than as numbers.
 
+> Full signatures: [`DateExpect[T]`](../reference/assertions.md#dateexpectt),
+> [`DateTimeExpect`](../reference/assertions.md#datetimeexpect),
+> [`TimeExpect`](../reference/assertions.md#timeexpect) and
+> [`TimeDeltaExpect`](../reference/assertions.md#timedeltaexpect).
+
 | Value | Subject | About |
 |---|---|---|
 | `date` | `DateExpect[T]` | a calendar day |
@@ -345,6 +350,11 @@ can't compare a timezone-aware datetime with a naive one: 2024-03-16T14:30:00 is
 Both raise `TypeError` rather than failing the assertion, deliberately: this is a
 bug in the test, not a fact about the value, and
 `Expected started_at to be before ...` would send you looking in the wrong place.
+
+`is_equal_to` is left alone in both cases. `==` across either mix is well
+defined and answers `False`, so a mismatched pair is an ordinary failure rather
+than a `TypeError`, and the message prints both reprs — which is what makes the
+mix visible in it.
 
 ### `has_day(32)` raises; `has_day(31)` in February fails
 
