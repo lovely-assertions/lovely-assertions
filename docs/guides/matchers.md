@@ -76,9 +76,6 @@ Expected created_row to equal {'id': <any str>, 'name': 'ada', 'created_at': <an
   values differ at key 'id': 7 instead of <any str>
 ```
 
-`<any str>` is the matcher's own `repr`, chosen to read as the phrase in a
-sentence — because that is the text you meet in a failing test.
-
 ## Where matchers work
 
 Anywhere a value is **compared**, which is more places than just `is_equal_to`:
@@ -109,8 +106,11 @@ work.
 ## The typing argument
 
 The usual objection to this trick comes from Jest, where `expect.any(Number)` is
-type-erased: TypeScript sees `any`, the slot it lands in stops being checked, and
-a typo in the *neighbouring* key sails through.
+type-erased: TypeScript sees `any`, so the slot it lands in stops being checked —
+`expect.any(String)` drops into a `number` field and nobody complains. Written
+inline it costs more than that one slot, since `toEqual` takes `unknown`: a typo
+in a *neighbouring* key sails through too. Annotating the expectation checks the
+neighbours again, and leaves the matcher's slot exactly as lost.
 
 That is a true account of the trick in JavaScript and a false one here, because a
 Python matcher can lie about its type in a way the checker still enforces:
@@ -136,9 +136,9 @@ matchers are their own types, so `list[int]` has to be widened to
 
 ### Where the checking actually bites
 
-Stated before anybody is disappointed by it. A matcher is refused where the slot
-it lands in has a **declared type**: an annotated variable, a container element,
-an assertion parameter carrying the element type. So
+A matcher is refused where the slot it lands in has a **declared type**: an
+annotated variable, a container element, an assertion parameter carrying the
+element type. So
 `expect(names).contains(any_instance_of(int))` on a `list[str]` is an error, and
 so is `rows: dict[str, int] = {"a": any_instance_of(str)}`.
 
@@ -165,9 +165,10 @@ except TypeError as error:
 <anything> is a matcher, so it belongs in an expectation rather than under expect(). Its declared type is a deliberate fiction -- the object is a placeholder, not a value of the type it claims -- so an assertion about it would be an assertion about the placeholder. Put it in the expected value instead: expect(row).is_equal_to({'id': any_instance_of(int)}).
 ```
 
-The declaration is a fiction, and the cost is worth stating rather than
-discovering: `any_instance_of(str)` is annotated `str` and has no `.upper()`.
-Never make one the subject, never store one, never operate on one.
+The declaration is a fiction: `any_instance_of(str)` is annotated `str` and has
+no `.upper()`. Never make one the subject and never operate on one. Storing one
+as an expectation is fine — an annotated constant is the form the section above
+recommends.
 
 ### A matcher cannot be found inside a `set`
 
@@ -201,8 +202,12 @@ print("a list is scanned, so the matcher is consulted")
 a list is scanned, so the matcher is consulted
 ```
 
-The exclusion is about the *lookup*, not about sets in general: give the same
-call an `occurrences=` constraint and it counts by scanning, so the matcher is
+The failing direction at least tells you. The other one does not:
+`expect({80, 443}).does_not_contain(any_instance_of(int))` passes, always, and
+that test can never fail.
+
+The exclusion is about the *lookup*, not about sets in general: give either call
+an `occurrences=` constraint and it counts by scanning, so the matcher is
 consulted after all.
 
 ```python

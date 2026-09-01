@@ -1,7 +1,7 @@
 # Migrating
 
-How what you write today maps onto what you would write here — and, just as
-importantly, where you should not bother.
+Row-by-row translations from plain `assert`, pytest, unittest, assertpy and
+PyHamcrest — and where a bare `assert` is still the better call.
 
 ## Where a plain `assert` is still the right call
 
@@ -14,11 +14,6 @@ result = 2 + 2
 
 assert result == 4  # already says everything
 expect(result).is_equal_to(4)  # says the same thing, longer
-print("both fine; the first is fine too")
-```
-
-```text
-both fine; the first is fine too
 ```
 
 pytest rewrites `assert` and prints a decent diff for free. Use `expect()` where
@@ -50,11 +45,14 @@ Mixing the two in one file is normal and expected.
 | `assert s.isdigit()` | `expect(s).is_digit()` — names the offending character |
 | `assert d["k"] == v` | `expect(d).contains_entry("k", v)` — tells missing from wrong |
 | `assert log.count(x) == 3` | `expect(log).contains(x, occurrences=exactly(3))` |
-| `assert x == a or x == b` | `expect(x).satisfies_any(lambda s: s.is_equal_to(a), lambda s: s.is_equal_to(b))` |
-| `if a: assert b` | `expect(a).implies(b)` |
+| `assert x == a or x == b` | `expect(x).is_one_of(a, b)` |
+| `if flag: assert b` (`flag` a `bool`) | [`expect(flag).implies(b)`](numbers.md#implies) — `b` is evaluated before the call, so it has to be safe to compute when `flag` is false |
 
 The pattern in that table: **each one buys a better failure, not a shorter
 line.** Where the failure is already good, leave the `assert`.
+
+`implies` is on the boolean subject alone. An `if` guarding on an object, a
+list or an int has no row here and stays an `if`.
 
 ## From `pytest`
 
@@ -65,7 +63,9 @@ line.** Where the failure is already good, leave the `assert`.
 | `pytest.warns(W)` | `expect_warns(W)` |
 | `pytest.approx(x)` | `expect(v).is_close_to(x)` — [the same four calling forms](numbers.md#floating-point-is_close_to) |
 | `pytest.approx(x, rel=r)` | `expect(v).is_close_to(x, rel=r)` |
-| — | `expect(fn).does_not_raise()` and `.does_not_warn()`, which pytest cannot express |
+| `pytest.approx(x, abs=a)` | `expect(v).is_close_to(x, tol=a)` — `abs` is spelled `tol` |
+| `values == pytest.approx([...])` | `expect(values).is_equivalent_to([close_to(a), close_to(b)])` — a collection has no `is_close_to`, so its items take the [`close_to`](matchers.md) matcher instead |
+| — | `expect(fn).does_not_warn()`, which `pytest.warns` cannot express, and `expect(fn).does_not_raise(E)` — calling the function already fails the test on any exception, but only this bans *one* type, lets the others travel on, and names the failure |
 
 ```python
 from lovely_assertions import expect_raises
@@ -79,11 +79,6 @@ with expect_raises(ValueError) as caught:
     parse_port("nope")
 
 caught.with_message_containing("invalid literal")
-print("the pytest.raises shape, with more to say afterwards")
-```
-
-```text
-the pytest.raises shape, with more to say afterwards
 ```
 
 The differences worth knowing: a failure here can be [collected by a soft
@@ -109,16 +104,26 @@ changes. Drop `expect()` into a `TestCase` method and it works.
 | `assertCountEqual(a, b)` | [`expect(a).is_equivalent_to(b, options=equivalency().ignoring_order())`](structural-equivalence.md) |
 | `subTest` for a batch of checks | [`soft_assertions()`](soft-assertions.md) |
 
-Note the argument order flips: `assertEqual(actual, expected)` becomes
-`expect(actual).is_equal_to(expected)`, so the value under test stays first.
+unittest calls its two arguments `first` and `second` and never says which is
+which. `expect()` does: the subject is the value under test. So `assertEqual(a,
+b)` maps straight across, and a suite written in the JUnit habit —
+`assertEqual(expected, actual)` — has to swap.
 
-`satisfies_any` takes branches that each receive the **subject**, so all of them
-are about one value — it is not a translation of an arbitrary `a or b`.
 `equivalency` is imported from `lovely_assertions` alongside `expect`.
 
 ## From `assertpy`
 
-The API will feel familiar — this is the same fluent shape. Three differences:
+The same fluent shape, under some different names.
+
+| `assertpy` | Here |
+|---|---|
+| `assert_that(x)` | `expect(x)` |
+| `is_length(n)` | `has_length(n)` |
+| `is_type_of(T)` | `is_exactly_instance_of(T)` |
+| `is_equal_to_ignoring_case(s)` | `is_equal_ignoring_case(s)` |
+| `assert_that(fn).raises(E).when_called_with(a)` | `expect(lambda: fn(a)).raises(E)`, or [`expect_raises(E)`](exceptions.md) around the call |
+
+Three differences go deeper than the spelling:
 
 **`extracting` takes a callable, not a string.**
 
@@ -127,11 +132,6 @@ from lovely_assertions import expect
 
 orders = [{"id": "ord-118"}, {"id": "ord-119"}]
 expect(orders).extracting(lambda order: order["id"]).contains("ord-118")
-print("callable form")
-```
-
-```text
-callable form
 ```
 
 `extracting("id")` cannot be typed: a checker cannot know the attribute exists,
@@ -145,8 +145,13 @@ method. Without a checker it is an ordinary `AttributeError` on the line that
 wrote it — either way it cannot pass silently, which is the point of the
 library.
 
-**Naming carries over unchanged.** `described_as` means what it means in
-`assertpy`, and `expect(value, name=...)` says the same thing a step earlier.
+**`described_as` takes a name, not a description.** assertpy brackets your text
+in front of an otherwise untouched message — `[checking the totals] Expected <1>
+to be equal to <2>, but was not.` Here the argument replaces the subject inside
+the sentence, so `described_as("checking the totals")` gives you *Expected
+checking the totals to equal 2, but was 1.* Pass a noun phrase — `"rows[3]"`,
+`"the refund total"`. `expect(value, name=...)` says the same thing a step
+earlier.
 
 ## From `PyHamcrest`
 
@@ -157,10 +162,14 @@ The matcher idea survives, in a smaller and more typed form:
 | `assert_that(x, equal_to(y))` | `expect(x).is_equal_to(y)` |
 | `assert_that(x, instance_of(T))` | `expect(x).is_instance_of(T)` |
 | `has_entries(...)` | `expect(d).contains_entries({...})` |
-| `contains_inanyorder(...)` | `expect(c).satisfies_in_any_order(...)` |
+| `contains_inanyorder(1, 2)` (values) | [`expect(c).is_equivalent_to([1, 2], options=equivalency().ignoring_order())`](structural-equivalence.md) — one-to-one, duplicates counted, as PyHamcrest pairs them |
+| `contains_inanyorder(m1, m2)` (matchers) | `expect(c).satisfies_in_any_order(p1, p2)` — one predicate per item |
 | `anything()` | [`anything()`](matchers.md), used *inside* an expectation |
 | `all_of(a, b)` | chain the assertions, or `satisfies` |
 | `any_of(a, b)` | `satisfies_any(...)` |
+
+`satisfies_any` takes branches that each receive the **subject**, so all of them
+are about one value — it is not a translation of an arbitrary `a or b`.
 
 The structural difference: PyHamcrest matchers are the assertion; here
 [matchers](matchers.md) are placeholders that go *inside* an expected value, and
@@ -173,8 +182,7 @@ the assertions are methods chosen by the subject's type.
 2. **Leave the rest alone.** A file with three `expect()` calls and twenty
    `assert`s is a healthy file.
 3. **Add [`register_formatter`](controlling-output.md) once**, in a `conftest`,
-   for the domain types that appear in your failures as memory addresses. This is
-   the highest-value single change in most codebases.
+   for the domain types that appear in your failures as memory addresses.
 4. **Reach for [`soft_assertions()`](soft-assertions.md)** in the tests that
    check several independent facts about one value.
 5. **Write [your own assertions](extending.md)** only once you notice the same
