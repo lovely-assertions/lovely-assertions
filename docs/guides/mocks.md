@@ -11,7 +11,61 @@ prefer it over `unittest.mock`'s own assertions: **a misspelling is caught**, an
 > Naming the subject costs one keyword and keeps your suite green under a strict
 > checker.
 
-## The safety argument
+## The catalogue
+
+```python
+from unittest.mock import Mock
+
+from lovely_assertions import expect, MockExpect
+
+fetch = Mock()
+fetch("/users")
+fetch("/orders", retries=2)
+
+expect(fetch, as_=MockExpect).has_call_count(2).was_called_with("/orders", retries=2)
+```
+
+| | Asserts |
+|---|---|
+| `was_called()` | at least once |
+| `was_not_called()` | never |
+| `was_called_once()` | exactly once, any arguments |
+| `was_called_with(...)` | the **last** call used these arguments |
+| `was_called_once_with(...)` | called exactly once, with these |
+| `was_ever_called_with(...)` | **some** call used these |
+| `was_never_called_with(...)` | no call did |
+| `has_call_count(n)` | called exactly `n` times — or takes an [occurrence](occurrences.md), so `has_call_count(at_least(2))` reads as it sounds |
+| `.calls` | a sequence subject over every recorded call |
+| `.last_call()` | asserts there was one, and continues on it with `.which` |
+
+Note the difference between `was_called_with` (the last call) and
+`was_ever_called_with` (any call) — the distinction `assert_called_with` and
+`assert_any_call` make, with names that say which is which.
+
+A failure names the mock and lists what it actually recorded:
+
+```python
+from unittest.mock import Mock
+
+from lovely_assertions import expect, MockExpect, AssertionFailure
+
+fetch = Mock()
+fetch("/users")
+fetch("/orders", retries=2)
+
+try:
+    expect(fetch, as_=MockExpect).was_not_called()
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected fetch not to have been called, but it was called 2 times: [('/users'), ('/orders', retries=2)].
+```
+
+## Why not `unittest.mock`'s own assertions
+
+### A misspelling passes
 
 A mock answers every attribute. That is what a mock is *for*, and it is also why
 an assertion made against one can be silently absent:
@@ -23,15 +77,14 @@ fetch.assert_called_once_wth("/users")  # passes. asserts nothing.
 ```
 
 `unittest.mock` knows this and defends with a **denylist**: `__getattr__` refuses
-any name beginning `assert`, `assret`, `asert`, `aseert` or `assrt`. So the
-common typo above is caught on a current interpreter.
+any name beginning `assert`, `assret`, `asert`, `aseert` or `assrt`, plus the
+assertion names with `assert_` stripped off — `called_once_with`, `not_called`
+and the rest. So the common typo above is caught on a current interpreter.
 
 A denylist catches the mistakes somebody thought of. It does not catch a name
 borrowed from another framework — `was_called_once_with`, `verify_called_with`,
 `toHaveBeenCalledWith` all return a child mock and pass — and `Mock(unsafe=True)`
-turns the guard off entirely. Nor can any denylist catch the version that is not
-a typo at all: `api.assert_not_called()` passes after `api.get("/a")`, because
-the call went to the *child* and the parent was never called.
+turns the guard off entirely.
 
 `expect()` needs no denylist:
 
@@ -57,11 +110,17 @@ An `AttributeError` on a `__slots__` subject with a fixed catalogue, in the test
 that wrote it, on the line that wrote it — for **every** misspelling, including
 the ones nobody has thought of yet.
 
-## The message argument
+One mistake this does not fix, because it is not a spelling mistake: after
+`api.get("/a")`, `api.assert_not_called()` passes — and so does
+`expect(api, as_=MockExpect).was_not_called()`. Every assertion here reads the
+mock's own recorded calls, and that call went to the *child*. Ask the child,
+`expect(api.get, as_=MockExpect)`, or the whole recording, `expect(api.mock_calls)`.
+
+### The failure says which call was wrong
 
 `assert_called_once_with` fails three different ways — never called, called with
-something else, called more than once — and reports all three as one sentence
-about the call count. Here each is its own message.
+something else, called more than once — and two of them come back as the same
+sentence about the count. Here each is its own message.
 
 **Called with the wrong arguments**, and the difference goes through the same
 engine as every other comparison:
@@ -136,46 +195,6 @@ Expected fetch to have been called with ('/nope') at some point, but none of its
   the closest was call 1:
     positional arguments:
       first difference at index 0: '/users' instead of '/nope'
-```
-
-## The catalogue
-
-| | Asserts |
-|---|---|
-| `was_called()` | at least once |
-| `was_not_called()` | never |
-| `was_called_once()` | exactly once, any arguments |
-| `was_called_with(...)` | the **last** call used these arguments |
-| `was_called_once_with(...)` | called exactly once, with these |
-| `was_ever_called_with(...)` | **some** call used these |
-| `was_never_called_with(...)` | no call did |
-| `has_call_count(n)` | called exactly `n` times — or takes an [occurrence](occurrences.md), so `has_call_count(at_least(2))` reads as it sounds |
-| `.calls` | a sequence subject over every recorded call |
-| `.last_call()` | asserts there was one, and continues on it with `.which` |
-
-Note the difference between `was_called_with` (the last call) and
-`was_ever_called_with` (any call) — the distinction `assert_called_with` and
-`assert_any_call` make, with names that say which is which.
-
-```python
-from unittest.mock import Mock
-
-from lovely_assertions import expect, MockExpect, AssertionFailure
-
-fetch = Mock()
-fetch("/users")
-fetch("/orders", retries=2)
-
-expect(fetch, as_=MockExpect).has_call_count(2)
-
-try:
-    expect(fetch, as_=MockExpect).was_not_called()
-except AssertionFailure as failure:
-    print(failure)
-```
-
-```text
-Expected fetch not to have been called, but it was called 2 times: [('/users'), ('/orders', retries=2)].
 ```
 
 ## Asserting on the calls themselves
@@ -256,8 +275,10 @@ call is checked on the instance too. Nothing else is.
 
 At runtime it is. To a type checker it is not, and the mock assertions are
 errors. This is not an oversight: typeshed puts an `Any` in `NonCallableMock`'s
-MRO, so a mock is assignable to *every* parameter type and no overload written
-for mocks could ever be reached. The full reasoning is in
+MRO, so a mock is assignable to *every* parameter type. An overload written for
+mocks would have to lead the chain to be reached at all, and one that leads it
+overlaps most of the others — a pile of suppressions for an answer that only
+helps where a parameter is *declared* `Mock`. The full reasoning is in
 [Typed dispatch](../concepts/typed-dispatch.md#the-one-place-the-two-halves-do-not-agree).
 
 **`expect(fetch, as_=MockExpect)` is the typed route**, and it is what every
@@ -269,6 +290,15 @@ example on this page uses.
 against the real signature, so `f(1)` and `f(x=1)` match. These do not — they
 compare what was recorded. An autospec'd mock's own assertion can therefore pass
 where `expect()` fails.
+
+### A call argument named `because`
+
+`because` is keyword-only on every assertion in the library, so a call the mock
+really made with `because=` cannot be spelled here: the value is taken as the
+failure reason, and the assertion then fails reporting the recorded `because=`
+as a keyword argument it did not expect. Assert on the recording instead, with
+`unittest.mock`'s own `call` —
+`expect(fetch, as_=MockExpect).calls.contains(call("/users", because="audit"))`.
 
 ### `unittest.mock` is never imported
 

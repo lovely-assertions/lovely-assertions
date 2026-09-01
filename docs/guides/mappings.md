@@ -45,8 +45,11 @@ Expected server_config to contain key 'hostname' (did you mean 'host'?), but the
 ```
 
 `(did you mean 'host'?)` is the whole investigation for the commonest mapping
-bug there is — a typo or a renamed field. The suggestion appears only when the
-keys are strings and one of them is close enough to be worth offering.
+bug there is — a typo or a renamed field. It appears when the key you looked up
+is a string and some string key present is close enough to it. The condition is
+on the key you asked for rather than on the mapping: mixed key types are fine, a
+non-string lookup never gets a suggestion. `contains_entry` carries the same
+clause on a missing key; the plural forms below carry none.
 
 ### A wrong entry and a missing entry are different sentences
 
@@ -74,7 +77,10 @@ Expected server_config to contain entry 'timeout': 30, but the key was missing; 
 
 *The key holds the wrong value* is a bug in the code under test. *The key is
 missing* is usually a bug in the contract, or in the test. They send you to
-different places, and `assert config == expected` renders them almost identically.
+different places. pytest's own diff does separate them — `Differing items:`
+against `Right contains 1 more item:` — but only if you build a whole expected
+mapping to ask about one field, and it omits the entries that agreed until you
+pass `-vv`. `contains_entry` asks about the one entry, and answers in a sentence.
 
 ## The plural forms
 
@@ -98,10 +104,16 @@ Expected server_config to contain keys ['host', 'timeout'], but was missing ['ti
 Expected server_config to contain entries {'port': 9090, 'tls': False}, but 'port' held 5432 instead of 9090, 'tls' held True instead of False.
 ```
 
-`contains_entries` reports **every** entry that disagreed, not just the first —
-so one run tells you the whole story. `contains_values(a, b)` is the same shape
-for values, and asks only that each appears *somewhere*, not that it appears
-under a particular key or that there are as many entries as values.
+`contains_entries` reports every entry that disagreed, not just the first — up to
+the preview cap, after which the message says how many more there were, and the
+echo of what you asked for is capped the same way. Widen both with a
+[`formatting` block](controlling-output.md#bounds-formatting).
+
+`contains_values(a, b)` is the same shape for values, and asks only that each
+appears *somewhere*, not that it appears under a particular key or that there are
+as many entries as values. Counting is a different question:
+`contains_value(v, occurrences=at_least(2))` asks how many keys hold it — see
+[counting occurrences](occurrences.md).
 
 `contains_only_keys` is the exhaustive version, for asserting a shape:
 
@@ -119,9 +131,11 @@ except AssertionFailure as failure:
 Expected server_config to contain only the keys ['host', 'port'], but also had ['tls'].
 ```
 
-The negatives — `does_not_contain_key`, `does_not_contain_keys`,
-`does_not_contain_entry`, `does_not_contain_value`, `does_not_contain_values` —
-say what was there instead:
+The negatives name what they found: `does_not_contain_key` reports the value that
+key held, `does_not_contain_value` the key that held it, and the plural
+`does_not_contain_keys` and `does_not_contain_values` list which of the ones you
+passed were present. `does_not_contain_entry` can only say the entry was there —
+you named both halves yourself, so there is nothing left to report.
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -139,14 +153,16 @@ Expected server_config not to contain key 'host', but it held 'db-01'.
 
 ## Descending into a value
 
-`contains_key(...)` returns a continuation, so you can assert on what the key
-holds without a second lookup:
+`contains_key(...)` returns a
+[continuation](../getting-started/chaining-and-narrowing.md), so you can assert on
+what the key holds without a second lookup:
 
 ```python
 from lovely_assertions import expect, AssertionFailure
 
 server_config = {"host": "db-01", "port": 5432, "tls": True}
 expect(server_config).contains_key("host").whose_value.is_equal_to("db-01")
+expect(server_config).contains_key("host").whose_value.as_type(str).starts_with("db-")
 
 try:
     expect(server_config).contains_key("host").whose_value.is_equal_to("db-99")
@@ -157,6 +173,12 @@ except AssertionFailure as failure:
 ```text
 Expected server_config to equal 'db-99', but was 'db-01'.
 ```
+
+`.whose_value` is typed as [the universal catalogue](any-value.md) over the value
+type, not as a string or a number subject — the value type of a mapping is not
+something a checker can turn into one. `is_equal_to` and its neighbours are there
+already; the typed catalogue is one step further in, which is why the second line
+names the type. `as_type(str)` is `is_instance_of(str).which` in one call.
 
 `.and_` goes back to the mapping instead, so you can keep asserting about the
 whole thing:
@@ -198,6 +220,10 @@ Expected server_config to contain 'nope', but was ['host', 'port', 'tls'].
 Note that the message still names `server_config` — the name follows you into the
 view, which is what you want in a failure.
 
+A view is a subject in its own right, not a continuation that remembers the
+mapping: `.and_` on it re-chains on the view. To ask another question about the
+mapping, start a new `expect(...)`.
+
 **They are properties, not methods.** Write `.keys`, not `.keys()`. And there is
 no `.items` view: an entry is what `contains_entry` and `contains_entries` are
 for.
@@ -228,6 +254,9 @@ Expected server_config to contain an entry matching the predicate, but the entri
 
 `contains_entry_matching` takes a predicate of **two arguments** — `(key, value)`
 — not one pair. `contains_value_matching` completes the set.
+
+All three hand back what they found, and `.which` continues on it: the matching
+key, the `(key, value)` pair, the stored value. So does `contains_value`.
 
 ## Length and emptiness
 
@@ -268,7 +297,7 @@ True == 1, so this passes
 
 Membership is Python's own `x is y or x == y`, and `True == 1` is true. If the
 distinction matters, assert the entry and the type:
-`expect(config).contains_key("tls").whose_value.is_exactly_instance_of(bool)`.
+`expect(server_config).contains_key("tls").whose_value.is_exactly_instance_of(bool)`.
 
 ### Comparing whole mappings
 

@@ -14,11 +14,14 @@ thing under test::
     expect(row).has_length(2)
 
 **The objection this trick usually attracts, and why it misses in Python.**
-Jest's ``expect.any(Number)`` is type-erased: TypeScript sees ``any``, the object
-slot it is dropped into stops being checked, and a typo in the *neighbouring* key
-goes through. That is a true account of the trick in JavaScript and a false one
-in Python, because a Python matcher can lie about its type in a way the checker
-still enforces:
+Jest's ``expect.any(Number)`` is type-erased: TypeScript sees ``any``, so the
+object slot it is dropped into stops being checked -- ``expect.any(String)``
+drops into a ``number`` field and nobody complains. Written inline it costs more
+than that one slot, since ``toEqual`` takes ``unknown``: a typo in a
+*neighbouring* key sails through too. Annotating the expectation checks the
+neighbours again and leaves the matcher's slot exactly as lost. That is a true
+account of the trick in JavaScript and a false one in Python, because a Python
+matcher can lie about its type in a way the checker still enforces:
 
 .. code-block:: python
 
