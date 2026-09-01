@@ -1,6 +1,9 @@
 # Your first assertions
 
-Every assertion in this library has the same shape:
+Every assertion has the same shape: the value under test, then what should be
+true of it. Learn the shape once and the rest of the library is a catalogue.
+
+Written out, it is:
 
 ```
 expect(the value under test).what_should_be_true(the expectation)
@@ -32,9 +35,8 @@ going, and that is the whole cost of it — a comparison and a return.
 
 ## Different values, different catalogues
 
-This is the part worth internalising early, because it changes how you look for
-an assertion. You do not memorise a global list; you type `expect(value).` and
-read what your editor offers.
+You do not memorise a global list; you type `expect(value).` and read what your
+editor offers.
 
 ```python
 from lovely_assertions import expect
@@ -43,12 +45,16 @@ expect("hello").is_lower()  # a string subject knows about case
 expect(3.5).is_positive()  # a number subject knows about sign
 expect([1, 2]).contains_no_duplicates()  # a collection subject knows about duplicates
 expect({"a": 1}).contains_value(1)  # a mapping subject knows about values
-print("each assertion exists only on its own subject")
+print("each of these exists only where it makes sense")
 ```
 
 ```text
-each assertion exists only on its own subject
+each of these exists only where it makes sense
 ```
+
+A large shared core sits under all of them: `is_equal_to`, `is_none`,
+`is_instance_of` and their neighbours are on every subject. What the value's type
+buys you is what gets added on top of that.
 
 `expect("hello").is_positive()` is not a runtime surprise waiting for you — it is
 an error your type checker reports before you run anything, because
@@ -58,8 +64,11 @@ is in [the reference](../reference/assertions.md).
 
 ## Saying why
 
-Any assertion takes `because=`. Your reason is appended to the sentence, never
-interpolated into it, so the message keeps its shape whatever you write.
+Any assertion takes `because=`. Your reason is appended to the end of the
+sentence rather than spliced into it, so it cannot break the message. Word it as
+a lower-case clause with no trailing full stop: the library ends the sentence
+itself, so a full stop of your own comes out doubled. A leading "because" is
+stripped, so writing one is harmless and pointless.
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -79,13 +88,15 @@ Use it for the fact a reader of the failure would otherwise have to go and find:
 the rule, the ticket, the invariant. Do not use it to restate the assertion —
 `because="it should be greater than zero"` adds a line and no information.
 
-`because=` costs nothing when the assertion passes. It is a plain argument that
-is never looked at until a failure is certain, so leave it in.
+A string literal there is free: the library never reads it unless the assertion
+fails. An expression is not — `because=explain()` is an ordinary argument, so
+Python runs it on every pass. Keep it a literal, and leave it in.
 
 ## Chaining
 
-Every assertion returns its subject, so assertions compose left to right. `and_`
-is a no-op property that exists only to make the chain read as a sentence.
+Every assertion returns something you can keep asserting on — usually the same
+subject, sometimes a narrower one — so they compose left to right. `and_` is a
+no-op property that exists only to make the chain read as a sentence.
 
 ```python
 from lovely_assertions import expect
