@@ -3,6 +3,9 @@
 Two subjects that both come up when you are asserting about *shape* rather than
 about a value.
 
+> Full signatures: [`TypeExpect`](../reference/assertions.md#typeexpect) and
+> [`EnumExpect[T]`](../reference/assertions.md#enumexpectt).
+
 ## Classes: `TypeExpect`
 
 `expect(SomeClass)` gives you a `TypeExpect` — a class is a class before it is
@@ -24,6 +27,10 @@ print(type(expect(Colour)).__name__, type(expect(int)).__name__)
 ```text
 TypeExpect TypeExpect
 ```
+
+Everything below asserts about the class itself. To ask what type a *value*
+has — `is_instance_of`, `is_exactly_instance_of`, `as_type` — see
+[any value](any-value.md#types).
 
 ### Inheritance
 
@@ -306,8 +313,12 @@ EnumExpect
 
 You find this out from the checker rather than from a failing test — run it
 anyway and you get the `AttributeError` above.
-[Typed dispatch](../concepts/typed-dispatch.md) has the reason the order is this
-way.
+
+The alternative — plain enums here, mixin enums with their mixin's catalogue —
+would make the subject depend on a choice the enum's *author* made, which nobody
+reading a test can be expected to hold in their head, and it would put `has_name`
+and `has_value` out of reach on exactly the enums people write most.
+[Typed dispatch](../concepts/typed-dispatch.md) has the ordering that follows.
 
 `is_equal_to`, `is_in` and `is_one_of` are on the generic subject and still work,
 and asking for the mixin's catalogue is one unambiguous move:

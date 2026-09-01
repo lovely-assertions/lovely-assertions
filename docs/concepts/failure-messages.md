@@ -104,9 +104,10 @@ vaguer message.
 ## Rule 3 — bounded per value and per level
 
 A message nobody reads is not a message. Every *value* is capped, and so is every
-*level* of a difference: a collection prints its first few items and counts the
-rest, one value prints about a terminal line, a diff prints a screenful, a
-difference descends a couple of levels into nested structure.
+*level* of a difference: comparing two five-thousand-element lists costs you a
+few hundred characters rather than sixty thousand.
+[Controlling output](../guides/controlling-output.md#bounds-formatting) has what
+the bounds are and how to raise them for a block.
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -121,10 +122,6 @@ except AssertionFailure as failure:
 ```text
 True
 ```
-
-Comparing two five-thousand-element lists costs you a few hundred characters
-rather than sixty thousand. When you are past skimming and need the
-whole thing, [raise the bounds for a block](../guides/controlling-output.md).
 
 The bounds are per part, and not on the message as a whole. A difference through
 nested structure can show `max_items` entries at each of `max_depth + 1` levels,
@@ -204,22 +201,14 @@ See [Controlling output](../guides/controlling-output.md).
 
 ## Where the subject name comes from
 
-At failure time — and only at failure time — the library parses the statement in
-your frame and recovers the expression you handed to `expect()`. It is Python's
-answer to C#'s `[CallerArgumentExpression]`.
-
-It needs the caller's source and an unambiguous answer. Two `expect()` calls in
-one statement, or no source file at all (a REPL, `exec`, a `.pyc` without its
-`.py`), and it says `the value` instead — because an ambiguous guess would be a
-*wrong* name, which is worse than no name.
-
-Nothing about this runs when an assertion passes: the library imports neither
-`ast` nor `linecache` until a failure happens, and
+The subject name is recovered from your source at failure time, and falls back to
+`the value` when it cannot be recovered unambiguously —
+[Reading a failure](../getting-started/reading-failures.md#where-the-name-comes-from)
+has the mechanism, when it gives up, and the two ways to name a subject yourself.
+Nothing about it runs when an assertion passes: the library imports neither `ast`
+nor `linecache` until a failure happens, and
 [Performance](performance.md#importing-costs-almost-nothing) shows how to check
-that for yourself. Where recovery has nothing useful to recover — a loop
-variable, a helper whose parameter is not the name the reader knows —
-[Reading a failure](../getting-started/reading-failures.md#when-it-cannot-tell)
-shows the two ways to say the name yourself.
+that for yourself.
 
 ## Why not just a diff?
 

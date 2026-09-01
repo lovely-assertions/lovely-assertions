@@ -251,6 +251,10 @@ ok
 original subject. See
 [Chaining and narrowing](../getting-started/chaining-and-narrowing.md).
 
+Every assertion here asks about the type *of a value*. To assert about a class
+itself — `is_subclass_of`, `implements`, `is_abstract` — pass the class to
+`expect()` and see [types and enums](types-and-enums.md).
+
 ## Predicates: `matches`
 
 For a one-off condition with no assertion of its own. Note that on a **string**
@@ -300,10 +304,14 @@ nested assertions each explain themselves.
 ## Nested assertions: `satisfies`
 
 `satisfies` runs assertions *inside* a value and collects them: one failure
-listing everything that was wrong, rather than stopping at the first. The
-callback must *assert*, not answer — `lambda o: o["total"] > 0` returns a
-verdict, which would have passed whatever the subject was, so it raises
-`TypeError` and points you at `matches`. Neither checker catches that one.
+listing everything that was wrong, rather than stopping at the first.
+
+The callback it takes is an **inspector** — a callable that *asserts*. A
+callable that *returns a verdict* is a **predicate**, which is what `matches`
+above takes. The library refuses to confuse the two: `lambda o: o["total"] > 0`
+returns a verdict, which would have passed whatever the subject was, so it
+raises `TypeError` at the call and points you at `matches`. Neither checker
+catches that one.
 
 ```python
 from lovely_assertions import expect, AssertionFailure

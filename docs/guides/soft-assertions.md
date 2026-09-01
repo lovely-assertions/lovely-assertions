@@ -171,12 +171,14 @@ for a `discard()` you want to keep off the outer report. Otherwise do not nest.
 
 ## Scoping formatters to a block
 
-`soft_assertions(formatters=(...,))` puts value formatters in front of the
-globally registered ones for as long as the block runs, innermost scope outwards.
-Global registration is write-once at import, because assertion state a test can
-mutate stops being safe the moment the runner goes parallel — so a scope is the
-only way to give one test a formatter of its own. See
-[Controlling output](controlling-output.md#where-to-register).
+`soft_assertions(formatters=(...,))` puts value formatters — the objects that
+say how a type is printed — in front of the globally registered ones for as long
+as the block runs, innermost scope outwards. Global registration belongs at
+import, and nothing takes a formatter back out, because assertion state a test
+can mutate stops being safe the moment the runner goes parallel — so a scope is
+the only way to give one test a formatter of its own.
+[Controlling output](controlling-output.md#where-to-register) has the worked
+example.
 
 ## Taking the failures instead of raising
 

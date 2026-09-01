@@ -1,14 +1,17 @@
 # Paths
 
-Two subjects, and the split between them is the useful part:
+Assertions on path shape, and assertions that touch the filesystem, kept apart
+by the type system. A `PurePath` subject genuinely has no `exists()` to call by
+mistake, so a test about *path shape* cannot accidentally hit the disk.
+
+> Full signatures:
+> [`PurePathExpect[T]`](../reference/assertions.md#purepathexpectt) and
+> [`PathExpect`](../reference/assertions.md#pathexpect).
 
 | Value | Subject | Touches the filesystem |
 |---|---|---|
 | `PurePath`, `PurePosixPath`, `PureWindowsPath` | `PurePathExpect[T]` | **no** — pure name algebra |
 | `Path`, `PosixPath`, `WindowsPath` | `PathExpect` | **yes** — and inherits all of the above |
-
-So a `PurePath` subject genuinely has no `exists()` to call by mistake, and a
-test about *path shape* cannot accidentally hit the disk.
 
 > `pathlib` is never imported by this library — the dispatch matches these types
 > by name. See [Performance](../concepts/performance.md#importing-costs-almost-nothing).

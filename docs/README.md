@@ -1,6 +1,8 @@
 # lovely-assertions documentation
 
-Fluent, strictly-typed assertions for Python tests.
+Fluent, strictly-typed assertions for Python tests: your editor offers only
+the assertions that fit the value, and a failure explains itself in a
+sentence.
 
 ```python
 from lovely_assertions import expect
@@ -47,8 +49,8 @@ write here, and is honest about where a plain `assert` is still the better call.
 
 ## Guides
 
-Task-oriented. Each page answers "how do I assert *this*?" and links into the
-reference for the exhaustive list.
+Task-oriented. Each page answers "how do I assert *this*?", and each of the
+subject pages below links into the reference for the exhaustive list.
 
 ### By what you are asserting on
 
@@ -83,8 +85,9 @@ reference for the exhaustive list.
 ## Reference
 
 [The assertion reference](reference/assertions.md) — every assertion on every
-subject, generated from the source and verified against it on every run. Start
-from [how to read it](reference/README.md) if you have not before.
+subject, generated from the source and verified against it on every run.
+[How the reference is built](reference/README.md) says what in it is derived,
+what is checked, and where the one gap is.
 
 ---
 

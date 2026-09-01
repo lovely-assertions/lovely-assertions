@@ -166,49 +166,20 @@ See [Mocks](../guides/mocks.md).
 
 ## Your own types
 
-Two routes, and they are for different situations.
+Two routes reach a subject of your own, and the difference between them is a
+dispatch question.
 
-**`as_=`** is the typed one. It is an overload of `expect()` itself, so the
-checker knows exactly what you get:
+**`as_=` is an overload of `expect()` itself.** The checker knows exactly what
+comes back — `expect(order, as_=OrderExpect)` is an `OrderExpect` statically and
+at runtime — so there is no second table to keep in step.
 
-```python
-from typing import Self
+**`register()` moves the runtime table only.** No checker reads a runtime
+registration, so a plain `expect(order)` builds your subject when the test runs
+while a checker goes on saying `Expect[Order]`. Registering *over* a built-in is
+refused outright: it would make the runtime answer differently from the overload
+chain, which is the one disagreement this design cannot survive.
 
-from lovely_assertions import Expect, custom_assertion, expect
-
-
-class Order:
-    def __init__(self, total: int) -> None:
-        self.total = total
-
-
-class OrderExpect(Expect[Order]):
-    __slots__ = ()
-
-    @custom_assertion
-    def is_shippable(self, *, because: str = "") -> Self:
-        if self._subject.total > 0:
-            return self
-        return self._fail(f"to be shippable, but its total was {self._subject.total}", because)
-
-
-expect(Order(50), as_=OrderExpect).is_shippable()
-print("dispatched by request")
-```
-
-```text
-dispatched by request
-```
-
-**`register()`** makes the runtime choose your subject for a type, so a plain
-`expect(order)` gets it. No checker can see a runtime registration, so this is a
-runtime-only improvement — useful when the values come from somewhere the
-annotations do not reach.
-
-Registering *over* a built-in is refused, because it would put the runtime out of
-step with the overload chain, which is the one thing this design cannot survive.
-
-Both are covered properly in [Extending](../guides/extending.md).
+Both routes, with a worked subject, are in [Extending](../guides/extending.md).
 
 ---
 

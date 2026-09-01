@@ -43,6 +43,7 @@ Never edit `assertions.md` by hand — the next run overwrites it.
 | Section | What is in it |
 |---|---|
 | **How to read this** | one worked example, and the facts that hold for every assertion |
+| **Contents** | a linked index of every section below it |
 | **Which subject you get** | the ordered dispatch table, and the surprising rows |
 | **Continuations** | `.and_`, `.which`, `.whose_value`, `.subject`, and `Found` |
 | **One section per subject** | `Expect[T]` first, since everything inherits it, then the rest roughly simplest-first |

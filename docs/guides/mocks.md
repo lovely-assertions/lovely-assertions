@@ -8,8 +8,10 @@ prefer it over `unittest.mock`'s own assertions: **a misspelling is caught**, an
 > runtime, and every example here would work without it — but a type checker
 > reads `TypeExpect` and rejects the mock assertions. That is not an oversight;
 > the reason is in [the gotcha below](#statically-expectmock-is-not-a-mockexpect).
-> Naming the subject costs one keyword and keeps your suite green under a strict
-> checker.
+> Naming the subject class costs one keyword and keeps your suite green under a
+> strict checker.
+
+> Full signatures: [`MockExpect`](../reference/assertions.md#mockexpect).
 
 ## The catalogue
 
