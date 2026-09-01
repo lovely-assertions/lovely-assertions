@@ -65,13 +65,24 @@ DB-01
 Stated up front rather than discovered: **the original variable is not narrowed.**
 `raw` stays `str | None`. `TypeGuard` and `TypeIs` narrow only a function's first
 positional argument, and `expect()` captures the value inside a wrapper. Narrowing
-flows through the returned subject — rebind it and the type is guaranteed. No
-Python assertion library does better; this one says so instead of implying
-otherwise.
+flows through the returned subject — rebind it and the type is guaranteed.
+
+And the subject it hands back is a plain `Expect[str]`, not a `StringExpect`, so
+Claim 1's catalogue is not on it: `expect(raw).is_not_none().starts_with("db")`
+is a type error. Re-specialising would catch a user's own `class Mine(Expect[str])`
+as well and hand it back mislabelled, so the
+[sound widening was kept](typing-divergences.md#is_not_none-returns-expects-not-a-re-specialised-subject)
+and you rebind: `expect(hostname).starts_with("db")`.
+
+No Python assertion library does better on either count; this one says so instead
+of implying otherwise.
 
 ## Claim 3 — failure messages that explain
 
-The competition prints a diff. This prints an explanation.
+The competition prints a diff and stops. This leads with a sentence naming the
+subject, what was expected and what was there, then adds a detail block
+underneath when there is more to say — where two structures part company, or a
+unified diff when the values are multi-line text.
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -101,9 +112,14 @@ except AssertionFailure as failure:
 Expected server_config to contain entry 'port': 9090, but that key held 8080.
 ```
 
-That pair is the whole argument. *The key is missing* and *the key holds a
-different value* are different bugs with different fixes, and the message says
-which — rather than handing you two dicts and letting you find out.
+That pair is the argument, though not because pytest confuses the two bugs. It
+prints `assert 'hostname' in {'host': 'db-01'}` and `assert 8080 == 9090`, which
+already say which one you have. Missing is the near-miss suggestion, which pytest
+has no way to reach, and the name of the value under test — in the second case
+the key `'port'` as well — which it puts on the source line above the failure
+rather than in the message. Under `--tb=line`, in a log, or outside pytest, that
+source line is gone and `assert 8080 == 9090` is all that is left. A rejected
+expression needs its surroundings; a diagnosis carries them.
 
 An assertion whose message says less than the comparison it replaces is worse
 than no assertion at all. That is the bar every assertion here is held to.

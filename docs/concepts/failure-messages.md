@@ -6,7 +6,8 @@ required reading when you are [writing your own assertions](../guides/extending.
 
 ## The grammar
 
-Every message in the library is assembled in exactly one place, from one template:
+Every failure *sentence* in the library is assembled in exactly one place, from
+one template:
 
 ```
 Expected {subject} {expectation}[ because {reason}].
@@ -32,7 +33,7 @@ Expected daily_totals to equal [10, 20, 30], but was [10, 20, 31] because the le
 
 | Part | Here | Comes from |
 |---|---|---|
-| **subject** | `daily_totals` | recovered from your source, or `name=` / `described_as` |
+| **subject** | `daily_totals` | recovered from your source, or `name=` / `described_as`; prefixed with the scope's path inside a named soft scope |
 | **expectation** | `to equal [10, 20, 30], but was [10, 20, 31]` | the assertion |
 | **reason** | `because the ledger is authoritative` | your `because=` |
 | **detail block** | `first difference at index 2: …` | the difference engine, when there is more to say |
@@ -100,12 +101,12 @@ because they send you to two different places. When an assertion cannot tell two
 causes apart, that is a reason to reconsider the assertion — not to write a
 vaguer message.
 
-## Rule 3 — always bounded
+## Rule 3 — bounded per value and per level
 
-A message nobody reads is not a message. Every rendering is capped: a collection
-prints its first few items and counts the rest, one value prints about a terminal
-line, a diff prints a screenful, a difference descends a couple of levels into
-nested structure.
+A message nobody reads is not a message. Every *value* is capped, and so is every
+*level* of a difference: a collection prints its first few items and counts the
+rest, one value prints about a terminal line, a diff prints a screenful, a
+difference descends a couple of levels into nested structure.
 
 ```python
 from lovely_assertions import expect, AssertionFailure
@@ -125,6 +126,13 @@ Comparing two five-thousand-element lists costs you a few hundred characters
 rather than sixty thousand. When you are past skimming and need the
 whole thing, [raise the bounds for a block](../guides/controlling-output.md).
 
+The bounds are per part, and not on the message as a whole. A difference through
+nested structure can show `max_items` entries at each of `max_depth + 1` levels,
+which multiplies out, and the report a
+[soft scope](../guides/soft-assertions.md) raises prints every failure it
+collected, uncapped. The shape above — one flat value against another — is the
+one this rule holds for outright.
+
 ## Rule 4 — the expectation is a sentence *fragment*
 
 An assertion never writes a whole sentence. It writes the middle of one:
@@ -135,15 +143,19 @@ An assertion never writes a whole sentence. It writes the middle of one:
 
 Lower case, no leading `Expected`, no trailing full stop. The one place that
 assembles messages adds the subject in front and the reason and the stop behind.
-This is what makes subject naming, `because=` and soft scopes work for every
-assertion without any of them wiring it up — including
-[yours](../guides/extending.md).
+This is what makes subject naming, `because=` and
+[soft scopes](../guides/soft-assertions.md) — a block that collects failures
+instead of stopping at the first — work for every assertion without any of them
+wiring it up, including [yours](../guides/extending.md).
 
 ## Rule 5 — values render through the registry
 
 Values inside a message go through the formatter registry rather than a raw
-`repr` at the call site. That is what lets you teach every message how your
-domain types read, in one place:
+`repr` at the call site. A formatter is any object with two methods —
+`can_handle(value)` says whether it claims the value, `format(value)` renders
+it — and the first to claim a value wins, so registering one teaches every
+message that renders that type how it reads. `format` receives an `object`,
+which is why the example narrows it with an `assert` for the type checker:
 
 ```python
 from lovely_assertions import expect, register_formatter, AssertionFailure
@@ -177,41 +189,37 @@ Expected price to equal GBP 9.99, but was GBP 12.50.
 ```
 
 Without the formatter, both sides of that message would have been a memory
-address. See [Controlling output](../guides/controlling-output.md).
+address.
+
+One limit, and it is not obvious. A message that renders your values one at a
+time — `contains`, a keys listing, the difference block under the sentence — asks
+the registry for each of them. A message that renders a *container* whole falls
+back to the container's `repr`, which calls each item's `__repr__` directly and
+never reaches your formatter: `expect([price]).is_equal_to([Money(999)])` puts
+the addresses back in the first line, and reads as money only in the difference
+below it. Register a formatter for the container type too, or assert on the
+items.
+
+See [Controlling output](../guides/controlling-output.md).
 
 ## Where the subject name comes from
 
-At failure time — and only at failure time — the library walks out to your frame,
-parses the statement being executed, and recovers the expression handed to
-`expect()`. It is Python's answer to C#'s `[CallerArgumentExpression]`.
+At failure time — and only at failure time — the library parses the statement in
+your frame and recovers the expression you handed to `expect()`. It is Python's
+answer to C#'s `[CallerArgumentExpression]`.
 
 It needs the caller's source and an unambiguous answer. Two `expect()` calls in
 one statement, or no source file at all (a REPL, `exec`, a `.pyc` without its
 `.py`), and it says `the value` instead — because an ambiguous guess would be a
 *wrong* name, which is worse than no name.
 
-Nothing about this runs when an assertion passes. `ast` and `linecache` are not
-even imported until a failure happens.
-
-Two ways to say the name yourself, for the cases where recovery has nothing
-useful to recover — a loop variable, or a helper whose parameter is not the name
-the reader knows:
-
-```python
-from lovely_assertions import expect, AssertionFailure
-
-for index, row in enumerate([{"ok": True}, {"ok": False}]):
-    try:
-        expect(row["ok"]).described_as(f"rows[{index}].ok").is_true()
-    except AssertionFailure as failure:
-        print(failure)
-```
-
-```text
-Expected rows[1].ok to be True, but was False.
-```
-
-`expect(value, name="...")` is the same thing said a step earlier.
+Nothing about this runs when an assertion passes: the library imports neither
+`ast` nor `linecache` until a failure happens, and
+[Performance](performance.md#importing-costs-almost-nothing) shows how to check
+that for yourself. Where recovery has nothing useful to recover — a loop
+variable, a helper whose parameter is not the name the reader knows —
+[Reading a failure](../getting-started/reading-failures.md#when-it-cannot-tell)
+shows the two ways to say the name yourself.
 
 ## Why not just a diff?
 
