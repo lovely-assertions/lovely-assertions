@@ -121,8 +121,10 @@ Expected Child to have the attribute 'timeout', but no such attribute is defined
 ```
 
 `does_not_have_attribute` and `does_not_implement` are the complements.
-`has_attribute(...).which` hands you the **descriptor**, not a computed value —
-you are asking about the class, not an instance.
+`has_attribute(...).which` hands you what `getattr` on the class returns: the
+value for a plain attribute, and the `property` object itself for a property —
+there is no instance for it to compute one from. An attribute assigned in
+`__init__` belongs to instances and is not found here at all.
 
 ### Abstractness
 
@@ -148,14 +150,22 @@ Expected Storage not to be abstract, but it leaves 'put' unimplemented.
 ```
 
 `is_abstract` is not "was declared with `ABC`" — it is "has unimplemented
-abstract methods", which is the property that actually stops you instantiating
-it. The message names the method.
+abstract methods", and the message names them. It is not a claim about
+instantiability: a `Protocol` leaves nothing unimplemented and still refuses
+construction, and so does any class whose `__init__` turns callers away. For
+"this cannot be built", reach for `expect(Storage).raises(TypeError)`, which
+makes the call.
 
 ### Callables
 
 `TypeExpect` extends `CallableExpect`, so a class also has `raises`,
 `raises_exactly`, `does_not_raise`, `warns` and `does_not_warn` — for asserting
-about the constructor. See [exceptions](exceptions.md).
+about the constructor. The assertion does the calling itself, and it calls with
+no arguments, so it asks about a constructor that takes none. Where the
+constructor takes arguments, wrap it:
+`expect(lambda: Order(-1)).raises(ValueError)`. Left unwrapped,
+`expect(Order).raises(TypeError)` passes on the argument you did not supply
+rather than on anything the test meant. See [exceptions](exceptions.md).
 
 ## Enum members: `EnumExpect`
 
@@ -190,6 +200,11 @@ Expected Colour.RED to have value 'green', but Colour.RED has value 'red'.
 
 `does_not_have_name` and `does_not_have_value` are the complements.
 
+An **alias** is a second spelling of one member, not a member of its own. Add
+`CRIMSON = "red"` to `Colour` and `Colour.CRIMSON` *is* `Colour.RED`, so
+`has_name("CRIMSON")` fails and `does_not_have_name("CRIMSON")` passes. The
+failure names `Colour.RED`, which is the member it was handed.
+
 ### Comparing across enumerations
 
 ```python
@@ -214,8 +229,12 @@ Expected Colour.RED to have the same value as Colour.GREEN, but had value 'red' 
 ```
 
 `has_same_value_as` and `has_same_name_as` compare *across* enumerations, so two
-members of unrelated enums can match where `is_equal_to` correctly says they are
-different objects. Both answers are right; pick the question you meant.
+members of unrelated enums can match where `is_equal_to` says they differ. That
+last part holds for a plain `Enum` like `Colour` only: an `IntEnum` or `StrEnum`
+member compares equal to anything carrying the same payload, so `is_equal_to`
+matches it against a member of an unrelated enumeration — and against the bare
+`1` or `"red"` it wraps. `is_same_as` is the one that always tells two members
+apart.
 
 ### Flags
 
@@ -247,10 +266,14 @@ both, so `does_not_have_flag(READ | WRITE)` passes for a value holding only
 `READ`. And the empty flag is a subset of everything, so `has_flag(Perm(0))`
 asserts nothing while `does_not_have_flag(Perm(0))` can never pass.
 
+"Either of these" is a different claim and gets a different spelling:
+`satisfies_any(lambda it: it.has_flag(Perm.READ), lambda it: it.has_flag(Perm.WRITE))`,
+one branch per flag.
+
 The flag assertions raise `TypeError` on a plain `Enum` or a foreign `Flag` — a
 caller mistake, not a finding.
 
-## The gotcha worth knowing
+### `IntEnum` and `StrEnum` members
 
 **An enum member is an enum before it is anything else.** An `IntEnum` member
 really is an `int`, and a `StrEnum` member really is a `str`, but both get
@@ -281,14 +304,13 @@ EnumExpect
 'EnumExpect' object has no attribute 'is_greater_than'
 ```
 
-The alternative — plain enums here, mixin enums with their mixin's catalogue —
-would make the subject depend on a choice the enum's *author* made, which nobody
-reading a test can be expected to hold in their head. It would also put
-`has_name` and `has_value` out of reach on exactly the enums people write most.
+You find this out from the checker rather than from a failing test — run it
+anyway and you get the `AttributeError` above.
+[Typed dispatch](../concepts/typed-dispatch.md) has the reason the order is this
+way.
 
-The cost is paid where it is cheapest: this is a **checker error**, not a runtime
-surprise. `is_equal_to`, `is_in` and `is_one_of` are on the generic subject and
-still work, and asking for the mixin's catalogue is one unambiguous move:
+`is_equal_to`, `is_in` and `is_one_of` are on the generic subject and still work,
+and asking for the mixin's catalogue is one unambiguous move:
 
 ```python
 from enum import IntEnum
@@ -308,9 +330,6 @@ print("the mixin's catalogue, asked for explicitly")
 ```text
 the mixin's catalogue, asked for explicitly
 ```
-
-An **alias** resolves to its canonical member, so `has_name` reports the
-canonical spelling rather than the one you wrote.
 
 ---
 
