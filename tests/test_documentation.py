@@ -536,26 +536,55 @@ def _pyright_errors(root: Path) -> dict[str, list[tuple[int, str]]]:
     return found
 
 
-#: ``file:line: error: message``, which is mypy's output and not a format it
-#: offers structurally -- ``--output=json`` exists but carries no severity that
-#: distinguishes an error from a note, so the prefix is what has to be read.
-_MYPY_ERROR: Final = re.compile(r"^(?P<file>.+?):(?P<line>\d+): error: (?P<message>.*?)(?:  \[|$)")
+#: One mypy diagnostic. ``--output=json`` exists but carries no severity that
+#: separates an error from a note, so the prefix is what has to be read.
+#:
+#: The file part is anchored on ``.py`` rather than left to stop at the first
+#: colon: mypy appends a column, and a span, to the line number when it is asked
+#: to, and a lazy split then swallows the line number into the filename. That
+#: fails *silently* -- the diagnostic is filed under a key nothing looks up, and
+#: a dropped diagnostic reads exactly like a clean page.
+_MYPY_ERROR: Final = re.compile(
+    r"^(?P<file>.+?\.py):(?P<line>\d+)(?::\d+)*: error: (?P<message>.*?)(?:  \[|$)"
+)
 
 
-def _mypy_errors(root: Path) -> dict[str, list[tuple[int, str]]]:
-    """Every mypy error over the written fragments, keyed by module name."""
-    result = subprocess.run(  # noqa: S603
+def _reported_module(path: str) -> str:
+    """The bare filename in a diagnostic, whichever platform wrote it.
+
+    ``Path`` splits on the separator of the interpreter running it, so a Windows
+    path read on any other system is one long name. The generated fragment names
+    hold no backslash of their own, so normalising is safe and lets one code path
+    serve both -- and lets a test pin both.
+    """
+    return path.replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def _mypy_run(root: Path) -> "subprocess.CompletedProcess[str]":
+    """Run mypy over the written fragments and hand back the whole result.
+
+    Kept apart from the parsing because silence is a legitimate answer -- clean
+    pages produce none -- so nothing in a parsed result can tell a clean tree
+    from a checker that never ran. The raw result is what tells them apart, and
+    :func:`test_each_checker_reports_a_fragment_it_must_reject` is what reads it.
+    """
+    return subprocess.run(  # noqa: S603
         [
             _tool("mypy"),
+            # None of the library's own configuration. The pages are checked
+            # under a bare `--strict`, and discovery would otherwise reach
+            # whatever `[tool.mypy]` the working directory happens to have --
+            # a dependency pyright does not have here, since it is handed a
+            # config of its own written into this same directory.
+            "--config-file=",
             "--strict",
             "--python-version",
             "3.13",
-            # A cache keyed on a temporary directory is written and thrown away,
-            # and an incremental run over modules that share names across pages
-            # is where mypy's cache and this harness disagree about identity.
+            # Module names repeat across pages, which is where an incremental
+            # run and this harness disagree about identity. It also means no
+            # cache is written, so none has to be pointed at a path that is a
+            # directory on one platform and a reserved device on another.
             "--no-incremental",
-            "--cache-dir",
-            os.devnull,
             "--no-error-summary",
             "--hide-error-context",
             str(root),
@@ -566,17 +595,24 @@ def _mypy_errors(root: Path) -> dict[str, list[tuple[int, str]]]:
         check=False,
         env={**os.environ, "MYPYPATH": str(REPO_ROOT / "src")},
     )
+
+
+def _parsed_mypy(result: "subprocess.CompletedProcess[str]") -> dict[str, list[tuple[int, str]]]:
+    """The errors in a mypy result, keyed by module name."""
     found: dict[str, list[tuple[int, str]]] = {}
     for line in result.stdout.splitlines():
         match = _MYPY_ERROR.match(line)
         if match is None:
             continue
-        found.setdefault(Path(match.group("file")).name, []).append(
+        found.setdefault(_reported_module(match.group("file")), []).append(
             (int(match.group("line")), match.group("message"))
         )
-    if not found and result.returncode not in (0, 1):  # pragma: no cover - mypy crashed
-        pytest.fail(f"mypy produced no diagnostics.\nstdout:\n{result.stdout}\n{result.stderr}")
     return found
+
+
+def _mypy_errors(root: Path) -> dict[str, list[tuple[int, str]]]:
+    """Every mypy error over the written fragments, keyed by module name."""
+    return _parsed_mypy(_mypy_run(root))
 
 
 #: Both checkers, run once over one written tree. Keyed by the name a test
@@ -670,7 +706,14 @@ def test_each_checker_reports_a_fragment_it_must_reject(tmp_path: Path) -> None:
     )
 
     assert _pyright_errors(tmp_path).get("broken.py"), "pyright reported nothing on a bad example"
-    assert _mypy_errors(tmp_path).get("broken.py"), "mypy reported nothing on a bad example"
+
+    result = _mypy_run(tmp_path)
+
+    assert _parsed_mypy(result).get("broken.py"), (
+        f"mypy reported nothing on a bad example, exiting {result.returncode}. "
+        f"Silence here is indistinguishable from a clean tree, so what it said is "
+        f"the whole diagnosis.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
 
 
 def test_the_examples_are_actually_being_checked() -> None:
@@ -684,3 +727,28 @@ def test_the_examples_are_actually_being_checked() -> None:
     prepared = _fragments()
 
     assert len(prepared) >= 100, f"only {len(prepared)} checkable examples found across the docs"
+
+
+def test_the_mypy_parser_reads_every_shape_a_diagnostic_takes() -> None:
+    """A path this parser mis-splits is dropped, and a dropped error reads as clean.
+
+    That is the failure worth pinning rather than the parsing itself: filing a
+    diagnostic under a key nothing looks up is indistinguishable, from every
+    assertion above, from a page that type-checks. Windows writes a drive letter
+    and backslashes, and mypy appends a column -- and a span -- to the line
+    number when it is asked to, so all four shapes are pinned here instead of
+    being met for the first time on a platform this suite cannot run locally.
+    """
+    reported = [
+        "/checked/pages/page__000.py:3: error: bad  [attr-defined]",
+        "/checked/pages/page__001.py:3:11: error: bad  [attr-defined]",
+        r"C:\Temp\pytest-0\page__002.py:3: error: bad  [attr-defined]",
+        r"C:\Temp\pytest-0\page__003.py:3:11:3:24: error: bad  [attr-defined]",
+    ]
+
+    parsed = _parsed_mypy(
+        subprocess.CompletedProcess(["mypy"], 1, stdout="\n".join(reported), stderr="")
+    )
+
+    assert sorted(parsed) == [f"page__{index:03d}.py" for index in range(4)]
+    assert all(errors == [(3, "bad")] for errors in parsed.values())
