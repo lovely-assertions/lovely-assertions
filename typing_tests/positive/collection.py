@@ -263,3 +263,22 @@ def a_subclass_keeps_its_identity_across_a_chain(tags: set[str]) -> None:
 def a_generic_subclass_keeps_its_element_type(numbers: set[int]) -> None:
     assert_type(BagExpect(numbers).contains(1), BagExpect[int])
     assert_type(BagExpect(numbers).subject, Collection[int])
+
+
+# ---------------------------------------------------------------------------
+# The vacuity guard's keyword
+# ---------------------------------------------------------------------------
+def allow_empty_is_keyword_only_and_returns_the_subject(
+    rows: CollectionExpect[int, set[int]],
+) -> None:
+    """One keyword, on the six assertions that quantify over the subject's items."""
+    assert_type(
+        rows.only_contains(lambda n: n > 0, allow_empty=True), CollectionExpect[int, set[int]]
+    )
+    assert_type(
+        rows.all_satisfy(lambda _n: None, allow_empty=True), CollectionExpect[int, set[int]]
+    )
+    assert_type(rows.all_equal_to(1, allow_empty=True), CollectionExpect[int, set[int]])
+    assert_type(rows.all_are_instance_of(int, allow_empty=True), CollectionExpect[int, set[int]])
+    assert_type(rows.all_are_exactly_type(int, allow_empty=True), CollectionExpect[int, set[int]])
+    assert_type(rows.contains_items_of_type(int, allow_empty=True), CollectionExpect[int, set[int]])

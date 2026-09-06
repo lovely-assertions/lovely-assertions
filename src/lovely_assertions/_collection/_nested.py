@@ -7,7 +7,7 @@ three runs of the test.
 
 from typing import TYPE_CHECKING, Any, Self
 
-from lovely_assertions._collection._base import CollectionBase
+from lovely_assertions._collection._base import VACUOUS, CollectionBase
 from lovely_assertions._collection._comparison import unmatched_predicate
 from lovely_assertions._collection._render import render_items
 from lovely_assertions._core import collect_failures, describe_predicate
@@ -29,7 +29,9 @@ class NestedAssertions[E, C: Collection[Any] = Collection[E]](CollectionBase[E, 
 
     __slots__ = ()
 
-    def all_satisfy(self, action: "Callable[[E], object]", /, *, because: str = "") -> Self:
+    def all_satisfy(
+        self, action: "Callable[[E], object]", /, *, allow_empty: bool = False, because: str = ""
+    ) -> Self:
         """Assert every item satisfies the nested assertions in ``action``.
 
         Failures inside ``action`` are collected rather than raised one at a
@@ -37,14 +39,22 @@ class NestedAssertions[E, C: Collection[Any] = Collection[E]](CollectionBase[E, 
         subject has positions -- says which one each finding came from. A
         non-assertion exception still propagates: a broken inspector is a bug in
         the test, not a finding about the subject.
+
+        **An empty collection fails**, because an inspection nothing was run
+        through has established nothing. Pass ``allow_empty=True`` where that is
+        what the test meant.
         """
         collected: list[tuple[int, list[str]]] = []
+        checked = False
         for index, item in enumerate(self._subject):
+            checked = True
             failures = collect_failures(action, item, "only_contains")
             if failures:
                 collected.append((index, failures))
         if not collected:
-            return self
+            if checked or allow_empty:
+                return self
+            return self._fail("to satisfy the inspection for every item" + VACUOUS, because)
         return self._fail(
             f"to satisfy the inspection for every item\n{self._findings(collected)}",
             because,

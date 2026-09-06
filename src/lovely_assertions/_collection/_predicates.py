@@ -7,7 +7,7 @@ what was screened and how much of it there was.
 
 from typing import TYPE_CHECKING, Any, Self, cast
 
-from lovely_assertions._collection._base import CollectionBase
+from lovely_assertions._collection._base import VACUOUS, CollectionBase
 from lovely_assertions._collection._clauses import (
     accepted_by,
     and_the_others,
@@ -133,14 +133,29 @@ class PredicateAssertions[E, C: Collection[Any] = Collection[E]](CollectionBase[
             ),
         )
 
-    def only_contains(self, predicate: "Callable[[E], bool]", /, *, because: str = "") -> Self:
-        """Assert every item satisfies ``predicate``."""
+    def only_contains(
+        self, predicate: "Callable[[E], bool]", /, *, allow_empty: bool = False, because: str = ""
+    ) -> Self:
+        """Assert every item satisfies ``predicate``.
+
+        **An empty collection fails**, because "every item matches" is vacuously
+        true of nothing and a test that lands here almost never meant to assert
+        nothing. Pass ``allow_empty=True`` where it did.
+        Reaching for ``is_not_empty()`` first says the same thing and reads
+        better at a call site that means both.
+        """
         subject = self._subject
+        checked = False
         for item in subject:
+            checked = True
             if not predicate(item):
                 return self._fail(
                     f"to contain only items matching {describe_predicate(predicate)},"
                     f" but {render_items(rejected_by(subject, predicate))} did not",
                     because,
                 )
-        return self
+        if checked or allow_empty:
+            return self
+        return self._fail(
+            "to contain only items matching " + describe_predicate(predicate) + VACUOUS, because
+        )
