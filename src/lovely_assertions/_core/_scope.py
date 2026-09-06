@@ -139,6 +139,26 @@ class SoftScope:
         """``/``-joined names of this scope and its ancestors, anonymous ones dropped."""
         return self._collector.path
 
+    @property
+    def failures(self) -> tuple[str, ...]:
+        """The messages collected so far, without emptying the scope.
+
+            with soft_assertions() as scope:
+                expect(row).is_equal_to(expected)
+                if scope.failures:
+                    return   # nothing further is worth checking
+
+        The read :meth:`discard` is not. ``discard`` is how a block *takes* its
+        findings and leaves quietly; this is how it looks at them and still
+        reports them on the way out. Peeking with ``discard`` empties the scope,
+        so a block that looked would silently stop reporting.
+
+        A tuple, and a copy: the list underneath is the live one ``__exit__``
+        reads, and handing it out would let a caller edit the report -- or watch
+        it change under them as later assertions land.
+        """
+        return tuple(self._collector.failures)
+
     def discard(self) -> list[str]:
         """Take the collected messages **without raising**, emptying the scope.
 

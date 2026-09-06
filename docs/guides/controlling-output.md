@@ -53,9 +53,42 @@ Expected audit_rows to contain 999, but was [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1
 | `max_chars` | characters shown for one value |
 | `max_diff_lines` | lines shown in a unified diff |
 | `max_depth` | levels a difference report descends into nested structure |
+| `max_failures` | collected failures a [soft scope](soft-assertions.md) writes out in its report |
 
 Exactly the assertions that were failing before still fail. The scope changes
 what a failure *says*, never whether it happens.
+
+### `max_failures` is read where the scope *ends*
+
+A soft scope builds its report on the way out of the block, so the bound that
+applies is whatever is in force at that moment — which means the
+`formatting()` block has to wrap the scope rather than sit inside it:
+
+```python
+from lovely_assertions import expect, soft_assertions, formatting, AssertionFailure
+
+try:
+    with formatting(max_failures=3), soft_assertions():
+        for row in range(7):
+            expect(row).is_equal_to(-1)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+7 assertions failed:
+  (1) Expected row to equal -1, but was 0.
+  (2) Expected row to equal -1, but was 1.
+  (3) Expected row to equal -1, but was 2.
+  ... (4 more)
+```
+
+Written the other way round — `with soft_assertions(), formatting(...)` — the
+formatting scope closes first and the report is built after it has gone. Nothing
+warns about it; the report simply comes out at the default width.
+
+Note what the bound does *not* touch: the heading counts every failure the scope
+collected. It bounds what the report says, never what the scope decided.
 
 ### Nesting composes
 

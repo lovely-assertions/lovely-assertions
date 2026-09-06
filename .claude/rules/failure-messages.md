@@ -46,12 +46,13 @@ to write a vaguer message.
 
 **Bounded per value and per level — not in total.** `max_items` caps one
 collection at one level, `max_chars` caps one rendered value and one line of a
-unified diff, `max_depth` caps how far a difference descends, and `max_diff_lines`
-caps the unified text diff and nothing else. A structural difference can therefore
-reach `max_items ** (max_depth + 1)` lines, and the report a soft scope raises
-loops its collected failures uncapped in `_core/_rendering.py` — whose own
-docstring claims the opposite. Both are gaps to close, not claims to make. Say
-what a bound actually bounds, and never write "bounded" of something that is not.
+unified diff, `max_depth` caps how far a difference descends, `max_diff_lines`
+caps the unified text diff and nothing else, and `max_failures` caps how many of
+a soft scope's collected failures its report writes out — never how many it
+counted, which is a fact about what the scope decided rather than about what it
+says. A structural difference can still reach `max_items ** (max_depth + 1)`
+lines, and that one is a gap to close rather than a claim to make. Say what a
+bound actually bounds, and never write "bounded" of something that is not.
 
 **Know which kind of bound a new number is.** A legibility bound is a field on
 `FormattingOptions`, read through `current_formatting()` at the point of use and

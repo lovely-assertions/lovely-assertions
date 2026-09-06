@@ -12,6 +12,7 @@ thousand failures is a report nobody reads.
 from typing import TYPE_CHECKING
 
 from lovely_assertions._exceptions import hide_internal_frames
+from lovely_assertions._formatting import current_formatting
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -61,17 +62,33 @@ def render_findings(collected: list[str], /) -> str:
 
 
 def render_aggregate(failures: list[str]) -> str:
-    """Build the message a soft scope raises on the way out."""
+    """Build the message a soft scope raises on the way out.
+
+    **Bounded, and only in what it prints.** Every collected failure is counted in
+    the heading; ``max_failures`` decides how many are written out underneath it.
+    A scope that collected five hundred of them has already told the reader the
+    shape of what went wrong, and five hundred numbered items is a report nobody
+    reads to the end -- while dropping any of them from the *count* would change
+    what the scope decided rather than what it says.
+
+    The bound is read here rather than passed in, so a reader who opens a wider
+    ``formatting()`` block around the scope sees more of the report. Failure path
+    only: this function runs once, after a scope has already failed.
+    """
     count = len(failures)
     noun = "assertion" if count == 1 else "assertions"
     lines = [f"{count} {noun} failed:"]
-    for index, message in enumerate(failures, 1):
+    limit = current_formatting().max_failures
+    for index, message in enumerate(failures[:limit], 1):
         # A message may run to several lines; its continuation is indented to sit
         # under the numbered item rather than under the list.
         head, newline, block = message.partition("\n")
         lines.append(f"  ({index}) {head}")
         if newline:
             lines.extend(f"      {line}" for line in block.splitlines())
+    withheld = count - limit
+    if withheld > 0:
+        lines.append(f"  ... ({withheld} more)")
     return "\n".join(lines)
 
 

@@ -1,4 +1,4 @@
-"""The four limits as one immutable value.
+"""The five limits as one immutable value.
 
 A hand-written frozen record rather than a dataclass, because ``dataclasses`` is
 one of the imports this package refuses to pay for at import time: the class is
@@ -18,6 +18,7 @@ from lovely_assertions._formatting._limits import (
     DEFAULT_MAX_CHARS,
     DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_DIFF_LINES,
+    DEFAULT_MAX_FAILURES,
     DEFAULT_MAX_ITEMS,
     MIN_DEPTH,
     MIN_SHOWN,
@@ -39,8 +40,9 @@ class FormattingOptions:
     context that inherits them, and a mutable one would let a nested block edit
     what its caller sees. :meth:`replace` derives a modified copy instead.
 
-        >>> FormattingOptions(max_items=3).replace(max_chars=40)
-        FormattingOptions(max_items=3, max_chars=40, max_diff_lines=20, max_depth=2)
+        >>> options = FormattingOptions(max_items=3).replace(max_chars=40)
+        >>> options.max_items, options.max_chars, options.max_diff_lines
+        (3, 40, 20)
 
     These change what a failing assertion *says*, never what an assertion
     *decides*. Raising ``max_items`` cannot turn a pass into a failure or the
@@ -48,11 +50,11 @@ class FormattingOptions:
 
     Every field is validated on the way in -- ``TypeError`` for a bound that is not
     an integer, ``ValueError`` for one below its minimum, which is ``1`` for the
-    three that bound how much is shown and ``0`` for ``max_depth``. So an instance
+    four that bound how much is shown and ``0`` for ``max_depth``. So an instance
     that exists is one every rendering site can use without re-checking it.
     """
 
-    __slots__ = ("max_chars", "max_depth", "max_diff_lines", "max_items")
+    __slots__ = ("max_chars", "max_depth", "max_diff_lines", "max_failures", "max_items")
 
     #: Items shown from one collection.
     max_items: int
@@ -60,10 +62,14 @@ class FormattingOptions:
     max_chars: int
     #: Lines of a unified diff.
     max_diff_lines: int
+    #: Collected failures a soft scope's report prints. Every failure is still
+    #: collected and the heading still counts them all; this bounds how many are
+    #: written out underneath it.
+    max_failures: int
     #: Levels of nested structure a *difference* descends into -- the bound in
     #: ``_diff``, and not the re-entry guard in ``_formatters.py``, which
     #: bounds recursion through user code and must keep a floor of its own.
-    #: ``0`` is legal here and means "do not descend"; the other three bound how
+    #: ``0`` is legal here and means "do not descend"; the other four bound how
     #: much of something is shown, so they must be at least ``1``.
     max_depth: int
 
@@ -74,8 +80,9 @@ class FormattingOptions:
         max_chars: int = DEFAULT_MAX_CHARS,
         max_diff_lines: int = DEFAULT_MAX_DIFF_LINES,
         max_depth: int = DEFAULT_MAX_DEPTH,
+        max_failures: int = DEFAULT_MAX_FAILURES,
     ) -> None:
-        # Keyword-only: four bare integers in a row is a footgun, and
+        # Keyword-only: five bare integers in a row is a footgun, and
         # `FormattingOptions(100, 2)` would not read as anything in particular.
         # Assigned through `object` because `__setattr__` below refuses -- the
         # hand-written half of a frozen dataclass.
@@ -85,6 +92,7 @@ class FormattingOptions:
             self, "max_diff_lines", checked("max_diff_lines", max_diff_lines, MIN_SHOWN)
         )
         object.__setattr__(self, "max_depth", checked("max_depth", max_depth, MIN_DEPTH))
+        object.__setattr__(self, "max_failures", checked("max_failures", max_failures, MIN_SHOWN))
 
     @override
     def __setattr__(self, name: str, _value: object, /) -> None:
@@ -105,12 +113,14 @@ class FormattingOptions:
             + str(self.max_diff_lines)
             + ", max_depth="
             + str(self.max_depth)
+            + ", max_failures="
+            + str(self.max_failures)
             + ")"
         )
 
     @override
     def __eq__(self, other: object, /) -> bool:
-        """Compare by value: two records with the same four bounds are equal.
+        """Compare by value: two records with the same five bounds are equal.
 
         Returns ``NotImplemented`` for anything that is not a
         :class:`FormattingOptions`, so Python falls back to the other operand and
@@ -124,11 +134,20 @@ class FormattingOptions:
             and self.max_chars == other.max_chars
             and self.max_diff_lines == other.max_diff_lines
             and self.max_depth == other.max_depth
+            and self.max_failures == other.max_failures
         )
 
     @override
     def __hash__(self) -> int:
-        return hash((self.max_items, self.max_chars, self.max_diff_lines, self.max_depth))
+        return hash(
+            (
+                self.max_items,
+                self.max_chars,
+                self.max_diff_lines,
+                self.max_depth,
+                self.max_failures,
+            )
+        )
 
     def replace(
         self,
@@ -137,6 +156,7 @@ class FormattingOptions:
         max_chars: int | None = None,
         max_diff_lines: int | None = None,
         max_depth: int | None = None,
+        max_failures: int | None = None,
     ) -> "FormattingOptions":
         """Derive a copy of these options with the named bounds changed.
 
@@ -144,7 +164,7 @@ class FormattingOptions:
             120
 
         ``None`` means "leave this one alone", which is what makes the copy
-        *partial*: naming one bound is not a request to reset the other three, and
+        *partial*: naming one bound is not a request to reset the other four, and
         naming none of them returns an equal copy. :func:`formatting` is this
         method with a ``ContextVar`` around it.
 
@@ -160,4 +180,5 @@ class FormattingOptions:
             max_chars=self.max_chars if max_chars is None else max_chars,
             max_diff_lines=self.max_diff_lines if max_diff_lines is None else max_diff_lines,
             max_depth=self.max_depth if max_depth is None else max_depth,
+            max_failures=self.max_failures if max_failures is None else max_failures,
         )
