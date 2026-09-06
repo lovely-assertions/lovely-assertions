@@ -39,7 +39,7 @@ from collections.abc import Callable, Collection
 from typing import Any, Final, cast
 
 import pytest
-from benchmarks import blocks_allocated
+from benchmarks import blocks_allocated, peak_bytes_allocated
 
 from _happy_calls import declared_by_the_subject
 from lovely_assertions import (
@@ -1979,10 +1979,10 @@ def test_enough_lookups_is_not_enough_when_the_container_dwarfs_them() -> None:
     assert searchable(lookups, one_item_too_wide) is one_item_too_wide
 
 
-#: A hundred and sixty times the ~1.2us the scan actually needs, and eighteen
-#: times *under* the 3.6ms an ungated table costs on the same call. Neither a
-#: loaded machine nor a fast one can move the verdict.
-_FRONT_LOADED_BUDGET_SECONDS: Final = 0.0002
+#: Sixty-four kilobytes. The scan's whole working set is under a kilobyte, and the
+#: table this rules out is six megabytes: two orders of magnitude above the one and
+#: two below the other, so neither a loaded machine nor a fast one moves the verdict.
+_FRONT_LOADED_BUDGET_BYTES: Final = 64 * 1024
 
 
 def test_needles_at_the_front_are_not_paid_for_by_hashing_everything_behind_them() -> None:
@@ -1991,23 +1991,28 @@ def test_needles_at_the_front_are_not_paid_for_by_hashing_everything_behind_them
     An early slice of a sorted collection is an ordinary thing to assert about,
     and it is the scan's best case: sixteen comparisons, one per needle, and it
     never touches the other ninety-nine thousand items. Hashing to answer it walks
-    all hundred thousand twice -- measured at 1.2us against 3.6ms, three thousand
-    times slower, and the ratio grows with the container rather than settling.
+    all hundred thousand twice and keeps a six-megabyte table to do it.
+
+    What is bounded is the table rather than the time spent building one, because
+    a clock cannot separate the two under a tracer: tracing multiplies the scan
+    and leaves the table exactly where it was, so the headroom a timing budget
+    relies on is the first thing to go. Measuring the bytes is also why this claim
+    carries no ``measured`` marker, unlike every other allocation claim here --
+    what it bounds is the table's six megabytes, and a tracer does not allocate
+    one of those.
     """
     container = list(range(100_000))
     at_the_front = list(range(_REPEATED_LOOKUPS_FROM))
 
     assert searchable(at_the_front, container) is container
 
-    started = time.perf_counter()
-    Bag(at_the_front).is_subset_of(container)
-    elapsed = time.perf_counter() - started
+    peak = peak_bytes_allocated(lambda: Bag(at_the_front).is_subset_of(container))
 
-    assert elapsed < _FRONT_LOADED_BUDGET_SECONDS, (
+    assert peak < _FRONT_LOADED_BUDGET_BYTES, (
         f"{_REPEATED_LOOKUPS_FROM} lookups at the front of a {len(container)}-item list "
-        f"took {elapsed * 1e6:.1f}us, past the {_FRONT_LOADED_BUDGET_SECONDS * 1e6:.0f}us "
-        f"budget. A scan stops where it finds the item; building a table does not -- "
-        f"see `_LONGEST_CONTAINER_PER_LOOKUP`."
+        f"allocated {peak:,} bytes, past the {_FRONT_LOADED_BUDGET_BYTES:,}-byte budget. "
+        f"A scan stops where it finds the item; building a table walks all of it and "
+        f"keeps what it built -- see `_LONGEST_CONTAINER_PER_LOOKUP`."
     )
 
 
