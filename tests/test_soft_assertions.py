@@ -17,7 +17,13 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from lovely_assertions import AssertionFailure, ValueFormatter, expect, soft_assertions
+from lovely_assertions import (
+    AssertionFailure,
+    ValueFormatter,
+    expect,
+    formatting,
+    soft_assertions,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -737,3 +743,116 @@ def test_a_reopened_scope_collects_again() -> None:
         expect(2).is_equal_to(9)
         expect(3).is_equal_to(9)
     assert "2 assertions failed" in str(caught.value)
+
+
+# ---------------------------------------------------------------------------
+# Reading what has been collected, without taking it
+# ---------------------------------------------------------------------------
+def test_failures_reads_without_emptying_the_scope() -> None:
+    """The read `discard` is not. Peeking with `discard` would silence the report."""
+    seen: tuple[str, ...] = ()
+    with pytest.raises(AssertionFailure) as caught, soft_assertions() as scope:
+        expect(1).is_equal_to(2)
+        seen = scope.failures
+        expect(3).is_equal_to(4)
+
+    assert seen == ("Expected 1 to equal 2, but was 1.",)
+    assert "2 assertions failed:" in str(caught.value)
+
+
+def test_failures_is_a_snapshot_and_not_the_live_list() -> None:
+    """A caller must not be able to edit the report, or watch it change under them."""
+    with soft_assertions() as scope:
+        expect(1).is_equal_to(2)
+        first = scope.failures
+        expect(3).is_equal_to(4)
+        second = scope.failures
+        scope.discard()
+
+    assert isinstance(first, tuple)
+    assert len(first) == 1
+    assert len(second) == 2
+
+
+def test_failures_is_empty_in_a_scope_that_has_none() -> None:
+    with soft_assertions() as scope:
+        expect(1).is_equal_to(1)
+        assert scope.failures == ()
+
+
+def test_a_block_can_stop_early_on_what_it_reads() -> None:
+    """The use case the guide advertises: give up once the first thing is wrong."""
+    reached_the_end = False
+
+    with pytest.raises(AssertionFailure), soft_assertions() as scope:
+        expect("a").is_equal_to("b")
+        if not scope.failures:
+            reached_the_end = True  # pragma: no cover - the point is that it is not reached
+
+    assert reached_the_end is False
+
+
+# ---------------------------------------------------------------------------
+# The report is bounded in what it prints, never in what it counts
+# ---------------------------------------------------------------------------
+def test_a_long_report_says_how_many_it_withheld() -> None:
+    with pytest.raises(AssertionFailure) as caught, formatting(max_failures=3), soft_assertions():
+        for value in range(7):
+            expect(value).is_equal_to(-1)
+
+    assert str(caught.value) == (
+        "7 assertions failed:"
+        "\n  (1) Expected value to equal -1, but was 0."
+        "\n  (2) Expected value to equal -1, but was 1."
+        "\n  (3) Expected value to equal -1, but was 2."
+        "\n  ... (4 more)"
+    )
+
+
+def test_the_heading_counts_every_failure_even_the_withheld_ones() -> None:
+    """The bound changes what the report *says*, never what the scope decided."""
+    with pytest.raises(AssertionFailure) as caught, formatting(max_failures=1), soft_assertions():
+        for value in range(50):
+            expect(value).is_equal_to(-1)
+
+    assert str(caught.value).startswith("50 assertions failed:")
+
+
+def test_a_report_within_the_bound_says_nothing_about_withholding() -> None:
+    with pytest.raises(AssertionFailure) as caught, formatting(max_failures=5), soft_assertions():
+        expect(1).is_equal_to(2)
+        expect(3).is_equal_to(4)
+
+    assert "more)" not in str(caught.value)
+
+
+def test_a_wider_block_shows_more_of_the_same_report() -> None:
+    """A legibility bound: opening a wider scope shows the reader more."""
+
+    def report(limit: int) -> str:
+        with (
+            pytest.raises(AssertionFailure) as caught,
+            formatting(max_failures=limit),
+            soft_assertions(),
+        ):
+            for value in range(6):
+                expect(value).is_equal_to(-1)
+        return str(caught.value)
+
+    assert report(2).count("\n  (") == 2
+    assert report(6).count("\n  (") == 6
+    assert "more)" not in report(6)
+
+
+def test_the_bound_in_force_is_the_one_where_the_scope_ends() -> None:
+    """The report is rendered on the way out, so an inner block has already closed.
+
+    Written down because the natural spelling is the wrong one:
+    ``with soft_assertions(), formatting(max_failures=3):`` closes the formatting
+    scope *first*, and the report is built after it has gone.
+    """
+    with pytest.raises(AssertionFailure) as caught, soft_assertions(), formatting(max_failures=1):
+        expect(1).is_equal_to(2)
+        expect(3).is_equal_to(4)
+
+    assert "more)" not in str(caught.value)

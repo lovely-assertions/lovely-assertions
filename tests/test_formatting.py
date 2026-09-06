@@ -129,7 +129,8 @@ def test_an_unknown_attribute_is_refused_too() -> None:
 
 def test_repr_names_every_field() -> None:
     assert repr(FormattingOptions(max_items=3)) == (
-        "FormattingOptions(max_items=3, max_chars=120, max_diff_lines=20, max_depth=2)"
+        "FormattingOptions(max_items=3, max_chars=120, max_diff_lines=20,"
+        " max_depth=2, max_failures=20)"
     )
 
 

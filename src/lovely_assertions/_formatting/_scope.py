@@ -67,6 +67,7 @@ def formatting(
     max_chars: int | None = None,
     max_diff_lines: int | None = None,
     max_depth: int | None = None,
+    max_failures: int | None = None,
 ) -> "AbstractContextManager[FormattingOptions]":
     """Scope different rendering bounds to a block.
 
@@ -103,6 +104,7 @@ def formatting(
         max_chars=checked_override("max_chars", max_chars, MIN_SHOWN),
         max_diff_lines=checked_override("max_diff_lines", max_diff_lines, MIN_SHOWN),
         max_depth=checked_override("max_depth", max_depth, MIN_DEPTH),
+        max_failures=checked_override("max_failures", max_failures, MIN_SHOWN),
     )
 
 
@@ -116,7 +118,14 @@ class _FormattingScope:
     an attribute lookup on a plain object.
     """
 
-    __slots__ = ("_max_chars", "_max_depth", "_max_diff_lines", "_max_items", "_token")
+    __slots__ = (
+        "_max_chars",
+        "_max_depth",
+        "_max_diff_lines",
+        "_max_failures",
+        "_max_items",
+        "_token",
+    )
 
     def __init__(
         self,
@@ -125,11 +134,13 @@ class _FormattingScope:
         max_chars: int | None,
         max_diff_lines: int | None,
         max_depth: int | None,
+        max_failures: int | None,
     ) -> None:
         self._max_items: int | None = max_items
         self._max_chars: int | None = max_chars
         self._max_diff_lines: int | None = max_diff_lines
         self._max_depth: int | None = max_depth
+        self._max_failures: int | None = max_failures
         self._token: Token[FormattingOptions] | None = None
 
     @override
@@ -146,6 +157,7 @@ class _FormattingScope:
                 ("max_chars", self._max_chars),
                 ("max_diff_lines", self._max_diff_lines),
                 ("max_depth", self._max_depth),
+                ("max_failures", self._max_failures),
             )
             if value is not None
         ]
@@ -157,6 +169,7 @@ class _FormattingScope:
             max_chars=self._max_chars,
             max_diff_lines=self._max_diff_lines,
             max_depth=self._max_depth,
+            max_failures=self._max_failures,
         )
 
     def __enter__(self) -> FormattingOptions:

@@ -1715,7 +1715,7 @@ of the list belongs.
 | Name | What it is |
 | --- | --- |
 | `FormattingOptions` | The bounds a failure message renders within. |
-| `formatting(*, max_items: int \| None = None, max_chars: int \| None = None, max_diff_lines: int \| None = None, max_depth: int \| None = None) -> AbstractContextManager[FormattingOptions]` | Scope different rendering bounds to a block. |
+| `formatting(*, max_items: int \| None = None, max_chars: int \| None = None, max_diff_lines: int \| None = None, max_depth: int \| None = None, max_failures: int \| None = None) -> AbstractContextManager[FormattingOptions]` | Scope different rendering bounds to a block. |
 | `current_formatting() -> FormattingOptions` | Return the bounds a failure message currently renders within. |
 | `register_formatter(formatter: ValueFormatter, /) -> None` | Register `formatter` for every failure message from here on. |
 | `ValueFormatter` | Renders a value into the text of a failure message. |

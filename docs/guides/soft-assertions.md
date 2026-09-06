@@ -206,6 +206,41 @@ print(collected)
 Useful when you are testing assertion behaviour itself, or aggregating findings
 into a report of your own rather than a test failure.
 
+### `failures` looks without taking
+
+`discard()` empties the scope, so a block that peeked with it would silently stop
+reporting. `failures` is the read that does not:
+
+```python
+from lovely_assertions import expect, soft_assertions
+
+with soft_assertions() as scope:
+    expect("ada").is_equal_to("grace")
+    print(scope.failures)
+    scope.discard()
+```
+
+```text
+('Expected "ada" to equal \'grace\', but was \'ada\'.',)
+```
+
+It is a tuple, and a copy: the list underneath is the live one the scope reports
+from on the way out, and handing it over would let a caller edit the report — or
+watch it change as later assertions land.
+
+Reach for it when the rest of a block is not worth running once something has
+already gone wrong:
+
+<!-- docs-test: skip - the shape at a call site, whose body belongs to the reader's test -->
+
+```python
+with soft_assertions() as scope:
+    expect(response.status).is_equal_to(200)
+    if scope.failures:
+        return  # the body is not worth parsing
+    expect(response.json()).contains_key("id")
+```
+
 ## The scope object
 
 `soft_assertions()` returns a `SoftScope`. You can hold on to it:

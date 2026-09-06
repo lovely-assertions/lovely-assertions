@@ -40,6 +40,14 @@ DEFAULT_MAX_CHARS: Final = 120
 DEFAULT_MAX_DIFF_LINES: Final = 20
 
 
+#: Collected failures a soft scope's report prints before it says how many it
+#: left out. Sized like the diff bound rather than the item bound, because a
+#: report is read as a block down the page rather than as a clause inside a
+#: sentence -- and because a scope that collected this many has already told the
+#: reader the shape of what went wrong.
+DEFAULT_MAX_FAILURES: Final = 20
+
+
 #: Levels of nested structure a *difference* descends into -- the value under a
 #: key, and the value under a key of that. It is the bound in ``_diff``, not
 #: the separate re-entry guard in ``_formatters.py``: that one bounds recursion
