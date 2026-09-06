@@ -22,7 +22,11 @@ below defines, so it is the first the chain's own call graph admits above the
 state they all read.
 """
 
-from lovely_assertions._equivalence._classification import KIND_LEAF, classify
+from lovely_assertions._equivalence._classification import (
+    KIND_LEAF,
+    classify,
+    stands_for_a_value,
+)
 from lovely_assertions._equivalence._findings import pair_difference, types_difference
 from lovely_assertions._equivalence._paths import path_excluded
 from lovely_assertions._equivalence._rendering import leaf_difference
@@ -117,7 +121,17 @@ class SelectingWalk(WalkState):
         actual_kind, actual_names = classify(actual)
         expected_kind, expected_names = classify(expected)
         if actual_kind != expected_kind:
-            self.findings.add(types_difference(path, actual, expected))
+            # A matcher is always a leaf, so anything composite meeting one lands
+            # here -- and "types differ" is the wrong reading of that pair twice
+            # over. A matcher's type is not a fact about the expectation: it is a
+            # private class name the reader has never seen, standing where the
+            # phrase the matcher renders as belongs. And the mismatch is not the
+            # finding either; the finding is that the value did not match. Asked
+            # of both sides because `==` lets a matcher land on either one.
+            if stands_for_a_value(actual) or stands_for_a_value(expected):
+                self.findings.add(leaf_difference(path, actual, expected, settled))
+            else:
+                self.findings.add(types_difference(path, actual, expected))
             return None
         if actual_kind == KIND_LEAF:
             self.findings.add(leaf_difference(path, actual, expected, settled))

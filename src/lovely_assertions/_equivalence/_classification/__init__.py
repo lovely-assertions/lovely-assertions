@@ -39,6 +39,9 @@ from lovely_assertions._equivalence._classification._fields import (
     stored_field_names as stored_field_names,
 )
 from lovely_assertions._equivalence._classification._opacity import is_opaque as is_opaque
+from lovely_assertions._equivalence._classification._opacity import (
+    stands_for_a_value as stands_for_a_value,
+)
 from lovely_assertions._equivalence._classification._routing import KIND_LEAF as KIND_LEAF
 from lovely_assertions._equivalence._classification._routing import KIND_MAPPING as KIND_MAPPING
 from lovely_assertions._equivalence._classification._routing import KIND_SEQUENCE as KIND_SEQUENCE
@@ -60,6 +63,7 @@ __all__ = [
     "declared_field_names",
     "is_enum_member",
     "is_opaque",
+    "stands_for_a_value",
     "stored_field_names",
 ]
 

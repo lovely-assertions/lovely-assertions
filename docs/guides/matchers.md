@@ -101,7 +101,56 @@ Expected fetch to have been called with (<any str>, retries=<one of 0, 1>), but 
 ```
 
 Sequences, mappings' values and recorded call arguments are all scans, and all
-work.
+work. So does
+[`is_equivalent_to`](structural-equivalence.md), where a matcher can stand for a
+whole nested record rather than a leaf:
+
+<!-- docs-test: expect-error - the deliberately wrong matcher on the last line is refused by the checker as well as at runtime, which is the second half of the lesson -->
+
+```python
+from dataclasses import dataclass
+
+from lovely_assertions import expect, any_instance_of, AssertionFailure
+
+
+@dataclass
+class Author:
+    id: int
+    name: str
+
+
+@dataclass
+class Post:
+    title: str
+    author: Author
+
+
+saved = Post(title="Hello", author=Author(id=7, name="ada"))
+
+expect(saved).is_equivalent_to(Post(title="Hello", author=any_instance_of(Author)))
+
+try:
+    expect(saved).is_equivalent_to(Post(title="Hello", author=any_instance_of(str)))
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected saved to be equivalent to Post(title='Hello', author=<any str>).
+  author: Author(id=7, name='ada') instead of <any str>
+  (compared with strict ordering, maximum depth 10)
+```
+
+The engine stops at the matcher rather than taking the record apart, which is
+what a matcher is for: it says the author is *some* `Author`, and nothing about
+the fields inside one.
+
+The second call is there twice over. It shows the message — the matcher renders
+as its phrase, not as the private class behind it — and it is *also* a checker
+error, because `any_instance_of(str)` is declared `str` and `Post.author` is
+declared `Author`. That is the rule below arriving in a real example: a matcher
+in a declared slot is checked like anything else, and the wrong one never
+reaches a test run.
 
 ## The typing argument
 
