@@ -28,15 +28,31 @@ module is for.
 
 The second half is the messages. ``assert_called_once_with`` fails three
 different ways -- never called, called with something else, called more than once
--- and reports all three as one sentence about the call count::
+-- and answers them in two shapes, neither of which says what the reader needs.
+
+Two of the three come back as the same sentence about the count, mentioning no
+arguments at all::
 
     Expected 'mock' to be called once. Called 3 times.
     Calls: [call('/users'), call('/other'), call('/users')].
 
-Which of those calls matched? Which argument was wrong? mock does not say. Here
-each of the three is its own message, argument differences go through the same
-difference engine every other assertion uses, and the message names the calls
-that *did* match -- the fact a reader otherwise has to work out by eye.
+Which of those three calls matched? It does not say, and that is the difference
+between "called the right thing twice too often" and "called three wrong things".
+
+The third comes back in a different shape, and only when there was exactly one
+call::
+
+    expected call not found.
+    Expected: mock('/a')
+      Actual: mock('/b')
+
+Two call lines, and the differing argument is left for the reader to spot. There
+is no count here and no listing, so the two shapes never appear together: a wrong
+argument on a mock called twice is reported purely as a count.
+
+Here each of the three is its own message, argument differences go through the
+same difference engine every other assertion uses, and the message names the
+calls that *did* match -- the fact a reader otherwise has to work out by eye.
 
 **Nothing here imports ``unittest.mock``**, at module level or inside a function.
 It is not needed: recognising a mock is a question about a class (see
