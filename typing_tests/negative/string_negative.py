@@ -41,6 +41,8 @@ def arguments_are_strings(text: str) -> None:
     expect(text).has_length("3")  # expect-error: a length is an int
     expect(text).contains(3)  # expect-error
     expect(text).contains_all("a", 2)  # expect-error
+    expect(text).contains_in_order("a", 2)  # expect-error
+    expect(text).does_not_contain_in_order(2)  # expect-error
     expect(text).starts_with(b"a")  # expect-error: bytes are not a prefix of a str
 
 

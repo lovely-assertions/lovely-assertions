@@ -2166,3 +2166,106 @@ def test_uuid_fault_still_answers_when_the_body_is_thirty_two_hexadecimal_digits
     clause = uuid_fault("b7f8b4d0-3a1e-4f2b-9c6a-1d2e3f4a5b6c", "b7f8b4d03a1e4f2b9c6a1d2e3f4a5b6c")
 
     assert clause == "'b7f8b4d0-3a1e-4f2b-9c6a-1d2e3f4a5b6c' could not be read as one"
+
+
+# ---------------------------------------------------------------------------
+# Fragments in order -- the claim `contains_all` cannot make
+# ---------------------------------------------------------------------------
+def test_contains_all_is_order_blind_which_is_why_this_exists() -> None:
+    """The premise, checked rather than asserted in prose.
+
+    A transcript that authenticated before it was ready satisfies
+    ``contains_all`` exactly as one that did it in the right order.
+    """
+    out_of_order = "connecting ... authenticated ... ready"
+    expect(out_of_order).contains_all("connecting", "ready", "authenticated")
+
+    with pytest.raises(AssertionFailure):
+        expect(out_of_order).contains_in_order("connecting", "ready", "authenticated")
+
+
+def test_contains_in_order_passes_when_the_order_holds() -> None:
+    expect("connecting ... ready ... authenticated").contains_in_order(
+        "connecting", "ready", "authenticated"
+    )
+
+
+def test_contains_in_order_names_the_fragment_that_arrived_too_early() -> None:
+    transcript = "connecting ... ready ... authenticated"
+    with pytest.raises(AssertionFailure) as caught:
+        expect(transcript).contains_in_order("connecting", "authenticated", "ready")
+
+    assert str(caught.value) == (
+        "Expected transcript to contain ['connecting', 'authenticated', 'ready'] in order,"
+        " but 'ready' did not appear after 'authenticated':"
+        " 'connecting ... ready ... authenticated'."
+    )
+
+
+def test_contains_in_order_tells_a_missing_fragment_from_a_misplaced_one() -> None:
+    """Two different bugs, so two different sentences."""
+    transcript = "connecting ... ready"
+    with pytest.raises(AssertionFailure) as caught:
+        expect(transcript).contains_in_order("connecting", "shutdown")
+
+    assert str(caught.value) == (
+        "Expected transcript to contain ['connecting', 'shutdown'] in order,"
+        " but 'shutdown' was missing from 'connecting ... ready'."
+    )
+
+
+def test_a_missing_first_fragment_reads_the_same_way() -> None:
+    with pytest.raises(AssertionFailure) as caught:
+        expect("ready").contains_in_order("connecting", "ready")
+
+    assert "but 'connecting' was missing from 'ready'" in str(caught.value)
+
+
+def test_fragments_do_not_overlap() -> None:
+    """The rule this subject already applies to counting."""
+    expect("aaaa").contains_in_order("aa", "aa")
+
+    with pytest.raises(AssertionFailure) as caught:
+        expect("aaa").contains_in_order("aa", "aa")
+
+    assert "did not appear after" in str(caught.value)
+
+
+def test_anything_at_all_may_sit_between_the_fragments() -> None:
+    expect("a" + "x" * 500 + "b").contains_in_order("a", "b")
+
+
+def test_does_not_contain_in_order_passes_when_the_order_is_wrong() -> None:
+    expect("ready ... connecting").does_not_contain_in_order("connecting", "ready")
+
+
+def test_does_not_contain_in_order_passes_when_a_fragment_is_absent() -> None:
+    """One missing fragment is enough; it does not ask for them to be absent."""
+    expect("connecting").does_not_contain_in_order("connecting", "ready")
+
+
+def test_does_not_contain_in_order_reports_the_order_it_found() -> None:
+    transcript = "connecting ... ready"
+    with pytest.raises(AssertionFailure) as caught:
+        expect(transcript).does_not_contain_in_order("connecting", "ready")
+
+    assert str(caught.value) == (
+        "Expected transcript not to contain ['connecting', 'ready'] in order,"
+        " but 'connecting ... ready' does, in that order."
+    )
+
+
+def test_both_refuse_a_call_with_no_fragments() -> None:
+    """An assertion that looks for nothing cannot fail."""
+    with pytest.raises(ValueError, match="at least one value"):
+        expect("abc").contains_in_order()
+
+    with pytest.raises(ValueError, match="at least one value"):
+        expect("abc").does_not_contain_in_order()
+
+
+def test_because_attaches_to_the_sentence() -> None:
+    with pytest.raises(AssertionFailure) as caught:
+        expect("b ... a").contains_in_order("a", "b", because="the handshake is ordered")
+
+    assert str(caught.value).endswith("because the handshake is ordered.")
