@@ -465,8 +465,37 @@ worth refusing loudly.
 
 The block form has no such guard. Calling an `async def` inside
 `with expect_raises(...)` only builds a coroutine, so you get `but nothing was
-raised` instead of the `TypeError`. Await the call, or run it:
-`expect(lambda: asyncio.run(fetch())).raises(ValueError)`.
+raised` instead of the `TypeError`. **Await it inside the block** — that is the
+form that works wherever you are, and it is what the refusal recommends first:
+
+```python
+import asyncio
+
+from lovely_assertions import expect_raises
+
+
+async def fetch() -> None:
+    raise ValueError("no route")
+
+
+async def main() -> None:
+    with expect_raises(ValueError) as caught:
+        await fetch()
+    print(caught.subject)
+
+
+asyncio.run(main())
+```
+
+```text
+no route
+```
+
+`expect(lambda: asyncio.run(fetch())).raises(ValueError)` works too — but only
+where no event loop is running. You meet this refusal from inside an async test,
+where one already is, and `asyncio.run` refuses to nest: you get a failure about
+the event loop rather than about `fetch`, plus a "never awaited" warning for the
+coroutine it built and dropped.
 
 ### A generator function is not drained
 

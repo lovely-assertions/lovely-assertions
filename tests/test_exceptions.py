@@ -29,6 +29,7 @@ have looked.
 directly; ``expect_raises`` is the form that needs no dispatch at all.
 """
 
+import asyncio
 import re
 from typing import TYPE_CHECKING, Any, Final
 
@@ -1148,9 +1149,59 @@ def test_an_awaitable_with_nothing_to_close_is_refused_all_the_same() -> None:
 
     assert str(caught.value) == (
         "the callable returned a coroutine without running: an async callable "
-        "cannot be asserted on synchronously. Await it and assert on the result, "
-        "or assert on a lambda that runs it -- expect(lambda: asyncio.run(fn()))"
+        "cannot be asserted on synchronously. Await it and assert on the result; "
+        "use the block form -- with expect_raises(E): await fn() -- to assert on "
+        "what it raises, which is what works inside a running event loop; or "
+        "expect(lambda: asyncio.run(fn())) where no loop is running"
     )
+
+
+def test_every_route_the_refusal_names_is_one_that_works() -> None:
+    """The advice is checked rather than asserted in prose, and it has to be.
+
+    Its previous wording offered ``expect(lambda: asyncio.run(fn()))`` alone, which
+    is correct only where no loop is running -- and a caller meets this refusal
+    from inside an async test, where a loop always is. ``asyncio.run`` refuses to
+    nest there, so the advice produced a ``RuntimeError`` about the event loop
+    plus the "never awaited" warning ``close_quietly`` exists to suppress: the
+    library handing the reader the exact noise it takes care to avoid.
+
+    All three routes the sentence now names are exercised, each in the condition
+    it claims to hold in.
+    """
+
+    async def boom() -> None:
+        raise ValueError("no")
+
+    async def inside_a_running_loop() -> None:
+        # The block form: what the sentence recommends first, and the only route
+        # that survives a loop already being up.
+        with expect_raises(ValueError) as caught:
+            await boom()
+        assert str(caught.subject) == "no"
+
+        # And the third route, in the condition the sentence excludes it from.
+        # Only the RuntimeError is asserted. The "never awaited" warning this also
+        # produces comes from the garbage collector, so when it arrives -- or
+        # whether it arrives inside this block at all -- is not something a test
+        # may depend on.
+        # `asyncio.run` refuses before awaiting, so the coroutine it was handed
+        # leaks -- which is the second half of why the advice was poor here, and
+        # is also noise this test has to clear up after itself rather than leave
+        # for the collector to attach to some later test.
+        pending = boom()
+        try:
+            with pytest.raises(AssertionFailure) as refused:
+                expect(lambda: asyncio.run(pending)).raises(ValueError)
+        finally:
+            pending.close()
+        assert "cannot be called from a running event loop" in str(refused.value)
+
+    asyncio.run(inside_a_running_loop())
+
+    # The third route, in the condition the sentence does claim it for. Nothing
+    # leaks here: with no loop running, `asyncio.run` actually runs the coroutine.
+    expect(lambda: asyncio.run(boom())).raises(ValueError)
 
 
 def test_a_close_that_is_not_callable_is_left_alone() -> None:

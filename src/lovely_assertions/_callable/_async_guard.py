@@ -60,13 +60,24 @@ def reject_awaitable(returned: object, /) -> None:
     finding about the subject. The coroutine is closed on the way out so the
     reader is not also handed a "never awaited" warning from somewhere else
     entirely.
+
+    **The advice names the block form first among the ways to keep asserting,
+    because it is the only one that works where this refusal is usually met.** A
+    caller reaches here from inside an async test, which means a loop is already
+    running -- and ``asyncio.run`` refuses to nest, so
+    ``expect(lambda: asyncio.run(fn()))`` there raises ``RuntimeError`` and leaks
+    the very "never awaited" warning the line above exists to suppress. It is
+    still correct where no loop is running, so it is offered last rather than
+    dropped.
     """
     if not is_awaitable(returned):
         return
     close_quietly(returned)
     message = (
         "the callable returned a coroutine without running: an async callable "
-        "cannot be asserted on synchronously. Await it and assert on the result, "
-        "or assert on a lambda that runs it -- expect(lambda: asyncio.run(fn()))"
+        "cannot be asserted on synchronously. Await it and assert on the result; "
+        "use the block form -- with expect_raises(E): await fn() -- to assert on "
+        "what it raises, which is what works inside a running event loop; or "
+        "expect(lambda: asyncio.run(fn())) where no loop is running"
     )
     raise TypeError(message)
