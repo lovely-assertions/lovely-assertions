@@ -72,6 +72,8 @@ passed, and the handshake was out of order
 `contains_in_order` is the claim that reads the same and checks the order too:
 
 ```python
+transcript = "connecting ... authenticated ... ready"
+
 try:
     expect(transcript).contains_in_order("connecting", "ready", "authenticated")
 except AssertionFailure as failure:
