@@ -37,6 +37,17 @@ Three statements, whose order is a discipline nobody checks:
 ```python
 from lovely_assertions import expect
 
+
+class Ledger:
+    def __init__(self) -> None:
+        self.rows: list[str] = []
+
+    def count(self) -> int:
+        return len(self.rows)
+
+
+ledger = Ledger()
+
 before = ledger.count()
 ledger.rows.append("b")
 expect(ledger.count() - before).is_equal_to(1)
@@ -51,6 +62,15 @@ away, so the hand-written form has one sentence for two different bugs:
 
 ```python
 from lovely_assertions import expect, AssertionFailure
+
+
+class Ledger:
+    def __init__(self) -> None:
+        self.rows: list[str] = []
+
+    def count(self) -> int:
+        return len(self.rows)
+
 
 rows = Ledger()
 before = rows.count()
@@ -72,6 +92,15 @@ value started:
 
 ```python
 from lovely_assertions import expect_change, AssertionFailure
+
+
+class Ledger:
+    def __init__(self) -> None:
+        self.rows: list[str] = []
+
+    def count(self) -> int:
+        return len(self.rows)
+
 
 empty = Ledger()
 try:
