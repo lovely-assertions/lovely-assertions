@@ -179,3 +179,23 @@ def the_string_only_pair_does_not_widen_a_subclass(tags: set[str]) -> None:
     catches.
     """
     assert_type(Tags(tags).contains_match("a*"), CollectionExpect[str])  # expect-error
+
+
+def allow_empty_is_a_keyword_and_a_bool(rows: CollectionExpect[int, set[int]]) -> None:
+    """It is keyword-only, and it takes a flag."""
+    rows.only_contains(lambda n: n > 0, True)  # expect-error: keyword-only
+    rows.only_contains(lambda n: n > 0, allow_empty="yes")  # expect-error
+    rows.all_equal_to(1, allow_empty=1)  # expect-error
+
+
+def the_paired_inspections_have_no_such_keyword(rows: CollectionExpect[int, set[int]]) -> None:
+    """They guard on length first, so the keyword would have no reachable effect."""
+    rows.satisfies_in_any_order(lambda n: n > 0, allow_empty=True)  # expect-error
+    rows.satisfies_respectively(lambda _n: None, allow_empty=True)  # expect-error
+
+
+def the_claims_true_of_nothing_have_no_such_keyword(rows: CollectionExpect[int, set[int]]) -> None:
+    """A negative or structural claim is satisfied by emptiness, not unverifiable over it."""
+    rows.contains_no_duplicates(allow_empty=True)  # expect-error
+    rows.does_not_contain_none(allow_empty=True)  # expect-error
+    rows.is_subset_of({1}, allow_empty=True)  # expect-error

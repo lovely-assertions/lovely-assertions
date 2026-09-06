@@ -29,7 +29,9 @@ class ScreeningAssertions[E, C: Collection[Any] = Collection[E]](ElementTypeAsse
 
     __slots__ = ()
 
-    def contains_items_of_type(self, expected_type: type[object], /, *, because: str = "") -> Self:
+    def contains_items_of_type(
+        self, expected_type: type[object], /, *, allow_empty: bool = False, because: str = ""
+    ) -> Self:
         """Assert every item is an instance of ``expected_type`` -- the FluentAssertions spelling.
 
         An alias of :meth:`all_are_instance_of`, the way
@@ -41,7 +43,7 @@ class ScreeningAssertions[E, C: Collection[Any] = Collection[E]](ElementTypeAsse
         it was written with, and an assertion that passes where the original
         fails is the one bug a library of assertions must not have.
         """
-        return self.all_are_instance_of(expected_type, because=because)
+        return self.all_are_instance_of(expected_type, allow_empty=allow_empty, because=because)
 
     def does_not_contain_items_of_type(
         self, unexpected_type: type[object], /, *, because: str = ""

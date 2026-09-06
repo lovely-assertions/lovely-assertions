@@ -25,6 +25,26 @@ if TYPE_CHECKING:
 __tracebackhide__ = hide_internal_frames
 
 
+#: The ``but ...`` half for a universal claim over an empty collection. Shared
+#: because five assertions say it and one sentence is one place for it to be
+#: right; the ``to ...`` half stays a literal at each call site, the way every
+#: expectation in this library does.
+#:
+#: **Why an empty collection fails by default.** "every item satisfies this" is
+#: vacuously true of nothing, and a test that reaches one of these over an empty
+#: collection almost never meant to assert nothing. The competitor that ships the
+#: guard opt-in and off leaves its users with the silent green unless they know to
+#: ask for it; defaulting to fail is the stronger position, and ``allow_empty=True``
+#: is there for the tests that genuinely mean it.
+#:
+#: No warning instead: a warning would fire on a *passing* assertion, which this
+#: library does not do.
+VACUOUS = (
+    ", but the collection was empty, so nothing was checked"
+    " (pass allow_empty=True if an empty collection should pass)"
+)
+
+
 class CollectionBase[E, C: Collection[Any] = Collection[E]](Expect[C]):
     """Assertions that do not depend on order, parameterised by element type.
 

@@ -264,6 +264,44 @@ print("ok")
 ok
 ```
 
+### An empty collection fails these
+
+"Every item satisfies this" is vacuously true of nothing, so a claim about every
+item over an empty collection checks nothing at all and passes. That is the one
+kind of green a test should never get for free:
+
+```python
+from lovely_assertions import expect, AssertionFailure
+
+
+def is_positive(total: int) -> bool:
+    return total > 0
+
+
+nothing: list[int] = []
+try:
+    expect(nothing).only_contains(is_positive)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected nothing to contain only items matching is_positive, but the collection was empty, so nothing was checked (pass allow_empty=True if an empty collection should pass).
+```
+
+The six that quantify over the subject's items — `only_contains`, `all_satisfy`,
+`all_equal_to`, `all_are_instance_of`, `all_are_exactly_type` and
+`contains_items_of_type` — all take `allow_empty=True` for the tests that
+genuinely meant it. `expect(rows).is_not_empty().only_contains(...)` says the
+same thing and often reads better at a call site that means both.
+
+**What is not affected**, because it is *satisfied* by emptiness rather than
+unverifiable over it: `is_sorted`, `contains_no_duplicates`, every `does_not_*`
+claim, and the subset relations. An empty list really is sorted, and the empty
+set really is a subset. And `satisfies_in_any_order` / `satisfies_respectively`
+already check length first, so with inspections they fail on an empty collection
+and with none of them they assert emptiness, which is their whole meaning.
+
 ## Finding an item
 
 ```python

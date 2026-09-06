@@ -636,8 +636,8 @@ whole of it and adds the assertions that need one.
 - `contains_matching(predicate: Callable[[E], bool], /, *, because: str = "") -> Found[Self, E]` — Assert some item satisfies `predicate`; continue on it with `.which`.
 - `does_not_contain_matching(predicate: Callable[[E], bool], /, *, because: str = "") -> Self` — Assert no item satisfies `predicate`.
 - `contains_single_matching(predicate: Callable[[E], bool], /, *, because: str = "") -> Found[Self, E]` — Assert exactly one item satisfies `predicate`; continue on it with `.which`.
-- `only_contains(predicate: Callable[[E], bool], /, *, because: str = "") -> Self` — Assert every item satisfies `predicate`.
-- `contains_items_of_type(expected_type: type[object], /, *, because: str = "") -> Self` — Assert every item is an instance of `expected_type` — the FluentAssertions spelling.
+- `only_contains(predicate: Callable[[E], bool], /, *, allow_empty: bool = False, because: str = "") -> Self` — Assert every item satisfies `predicate`.
+- `contains_items_of_type(expected_type: type[object], /, *, allow_empty: bool = False, because: str = "") -> Self` — Assert every item is an instance of `expected_type` — the FluentAssertions spelling.
 - `does_not_contain_items_of_type(unexpected_type: type[object], /, *, because: str = "") -> Self` — Assert no item is an instance of `unexpected_type`, subclasses included.
 - `does_not_contain_none(*, key: Callable[[E], object] | None = None, because: str = "") -> Self` — Assert no item is `None`, or — with `key` — that no item *yields* one.
 - `has_unique_items(*, key: Callable[[E], object] | None = None, because: str = "") -> Self` — Assert no item appears twice, or — with `key` — no *key* does.
@@ -665,13 +665,13 @@ whole of it and adds the assertions that need one.
 
 **Element types**
 
-- `all_are_instance_of(expected_type: type[object], /, *, because: str = "") -> Self` — Assert every item is an instance of `expected_type`, subclasses included.
-- `all_are_exactly_type(expected_type: type[object], /, *, because: str = "") -> Self` — Assert every item is exactly `expected_type` — a subclass does not count.
-- `all_equal_to(value: E, /, *, because: str = "") -> Self` — Assert every item equals `value`.
+- `all_are_instance_of(expected_type: type[object], /, *, allow_empty: bool = False, because: str = "") -> Self` — Assert every item is an instance of `expected_type`, subclasses included.
+- `all_are_exactly_type(expected_type: type[object], /, *, allow_empty: bool = False, because: str = "") -> Self` — Assert every item is exactly `expected_type` — a subclass does not count.
+- `all_equal_to(value: E, /, *, allow_empty: bool = False, because: str = "") -> Self` — Assert every item equals `value`.
 
 **Nested assertions**
 
-- `all_satisfy(action: Callable[[E], object], /, *, because: str = "") -> Self` — Assert every item satisfies the nested assertions in `action`.
+- `all_satisfy(action: Callable[[E], object], /, *, allow_empty: bool = False, because: str = "") -> Self` — Assert every item satisfies the nested assertions in `action`.
 - `satisfies_in_any_order(*predicates: Callable[[E], bool], because: str = "") -> Self` — Assert each predicate holds for a *distinct* item, in any order.
 
 **Wildcard matching (string collections)**

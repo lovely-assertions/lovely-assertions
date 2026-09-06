@@ -2320,3 +2320,147 @@ def test_bounding_an_item_does_not_change_an_ordinary_message() -> None:
         expect(values).has_length(9)
 
     assert str(caught.value) == "Expected values to have length 9, but had 3: [1, 2, 3]."
+
+
+# ---------------------------------------------------------------------------
+# A claim about every item, over no items at all
+# ---------------------------------------------------------------------------
+class _Awkward(list[object]):
+    """A container that refuses to be truth-tested.
+
+    The shape a numpy array and a pandas Series take, and the reason none of the
+    guards below may write ``if subject:``. A truth test would turn a currently
+    passing assertion into a ``ValueError`` on the *happy* path, which is a worse
+    outcome than the vacuity it was added to catch.
+    """
+
+    __slots__ = ()
+
+    def __bool__(self) -> bool:
+        raise ValueError("the truth value of this container is ambiguous")
+
+
+def _always(item: object) -> bool:
+    del item
+    return True
+
+
+def _inspects(item: object) -> None:
+    del item
+
+
+#: One call per assertion that quantifies over the subject's items, in the shape
+#: the four guards below all take: hand it a collection, get an assertion made.
+_Vacuity = tuple[str, Callable[[list[object]], object]]
+
+_VACUOUS: Final[list[_Vacuity]] = [
+    ("only_contains", lambda subject: expect(subject).only_contains(_always)),
+    ("all_satisfy", lambda subject: expect(subject).all_satisfy(_inspects)),
+    ("all_equal_to", lambda subject: expect(subject).all_equal_to(1)),
+    ("all_are_instance_of", lambda subject: expect(subject).all_are_instance_of(int)),
+    ("all_are_exactly_type", lambda subject: expect(subject).all_are_exactly_type(int)),
+    ("contains_items_of_type", lambda subject: expect(subject).contains_items_of_type(int)),
+]
+
+_ALLOWING: Final[list[_Vacuity]] = [
+    ("only_contains", lambda subject: expect(subject).only_contains(_always, allow_empty=True)),
+    ("all_satisfy", lambda subject: expect(subject).all_satisfy(_inspects, allow_empty=True)),
+    ("all_equal_to", lambda subject: expect(subject).all_equal_to(1, allow_empty=True)),
+    (
+        "all_are_instance_of",
+        lambda subject: expect(subject).all_are_instance_of(int, allow_empty=True),
+    ),
+    (
+        "all_are_exactly_type",
+        lambda subject: expect(subject).all_are_exactly_type(int, allow_empty=True),
+    ),
+    (
+        "contains_items_of_type",
+        lambda subject: expect(subject).contains_items_of_type(int, allow_empty=True),
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "call"), _VACUOUS, ids=[name for name, _ in _VACUOUS])
+def test_a_claim_about_every_item_fails_over_no_items(
+    name: str, call: "Callable[[list[object]], object]"
+) -> None:
+    """Vacuously true is not true enough. A test that lands here meant something else."""
+    with pytest.raises(AssertionFailure) as caught:
+        call([])
+
+    assert str(caught.value).endswith(
+        "but the collection was empty, so nothing was checked"
+        " (pass allow_empty=True if an empty collection should pass)."
+    ), name
+
+
+@pytest.mark.parametrize(("name", "call"), _ALLOWING, ids=[name for name, _ in _ALLOWING])
+def test_allow_empty_is_how_a_test_says_it_meant_it(
+    name: str, call: "Callable[[list[object]], object]"
+) -> None:
+    call([])
+    del name
+
+
+@pytest.mark.parametrize(("name", "call"), _VACUOUS, ids=[name for name, _ in _VACUOUS])
+def test_a_non_empty_collection_is_unaffected(
+    name: str, call: "Callable[[list[object]], object]"
+) -> None:
+    """The guard changes one case and leaves every other one alone."""
+    call([1, 1])
+    del name
+
+
+@pytest.mark.parametrize(("name", "call"), _VACUOUS, ids=[name for name, _ in _VACUOUS])
+def test_no_guard_truth_tests_the_subject(
+    name: str, call: "Callable[[list[object]], object]"
+) -> None:
+    """``if subject:`` would turn a passing assertion into an error on the happy path."""
+    call(_Awkward([1, 1]))
+    del name
+
+
+@pytest.mark.parametrize(("name", "call"), _VACUOUS, ids=[name for name, _ in _VACUOUS])
+def test_an_empty_awkward_container_still_fails_cleanly(
+    name: str, call: "Callable[[list[object]], object]"
+) -> None:
+    """It reports, rather than raising the container's own refusal."""
+    with pytest.raises(AssertionFailure):
+        call(_Awkward([]))
+    del name
+
+
+def test_the_claims_that_are_genuinely_true_of_nothing_are_left_alone() -> None:
+    """Not every assertion that passes on an empty collection is passing for nothing.
+
+    A negative claim and a structural one are *satisfied* by emptiness rather
+    than unverifiable over it, and the empty set really is a subset. Those are
+    standard readings and stay as they were.
+    """
+    nothing: list[int] = []
+    no_members: set[int] = set()
+
+    expect(nothing).is_sorted()
+    expect(nothing).contains_no_duplicates()
+    expect(nothing).does_not_contain_none()
+    expect(nothing).does_not_contain_matching(_always)
+    expect(no_members).is_subset_of({1})
+    expect(no_members).is_proper_subset_of({1})
+
+
+def test_the_paired_inspections_already_refused_an_empty_collection() -> None:
+    """They guard on length first, so `allow_empty=` there would have no effect.
+
+    Pinned so nobody adds one: with predicates they already fail, and with none
+    they assert emptiness, which is their documented meaning.
+    """
+    nothing: list[int] = []
+
+    with pytest.raises(AssertionFailure):
+        expect(nothing).satisfies_in_any_order(_always)
+    with pytest.raises(AssertionFailure):
+        expect(nothing).satisfies_respectively(_inspects)
+
+    expect(nothing).satisfies_in_any_order()
+    expect(nothing).satisfies_respectively()
