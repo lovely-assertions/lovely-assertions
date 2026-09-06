@@ -400,6 +400,8 @@ predicate form still works.
 - `does_not_contain(unexpected: str, /, *, occurrences: Occurrence | None = None, because: str = "") -> Self` — Assert `unexpected` appears nowhere in the string.
 - `contains_all(*values: str, because: str = "") -> Self` — Assert every one of `values` appears in the string.
 - `does_not_contain_all(*values: str, because: str = "") -> Self` — Assert at least one of `values` is absent from the string.
+- `contains_in_order(*values: str, because: str = "") -> Self` — Assert every one of `values` appears, in this order, not necessarily adjacent.
+- `does_not_contain_in_order(*values: str, because: str = "") -> Self` — Assert `values` do not all appear in this order.
 - `contains_any(*values: str, because: str = "") -> Self` — Assert at least one of `values` appears in the string.
 - `does_not_contain_any(*values: str, because: str = "") -> Self` — Assert none of `values` appears in the string.
 - `contains_ignoring_case(value: str, /, *, occurrences: Occurrence | None = None, because: str = "") -> Self` — Assert `value` appears in the string, whatever the case of either.

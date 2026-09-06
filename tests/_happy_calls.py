@@ -314,6 +314,10 @@ HAPPY_CALLS: Final[dict[tuple[str, str], Callable[[World], object]]] = {
     # -- StringExpect ------------------------------------------------------
     ("StringExpect", "contains"): lambda _: expect("abcabc").contains("a", occurrences=exactly(2)),
     ("StringExpect", "contains_all"): lambda _: expect("abc").contains_all("a", "b"),
+    ("StringExpect", "contains_in_order"): lambda _: expect("a-b-c").contains_in_order("a", "c"),
+    ("StringExpect", "does_not_contain_in_order"): lambda _: expect(
+        "a-b-c"
+    ).does_not_contain_in_order("c", "a"),
     ("StringExpect", "contains_any"): lambda _: expect("abc").contains_any("a", "z"),
     ("StringExpect", "contains_ignoring_case"): lambda _: expect("ABC").contains_ignoring_case("a"),
     ("StringExpect", "does_not_contain"): lambda _: expect("abc").does_not_contain("z"),

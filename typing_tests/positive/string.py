@@ -49,6 +49,8 @@ def containment(text: str) -> None:
     assert_type(expect(text).contains("x"), StringExpect)
     assert_type(expect(text).does_not_contain("x"), StringExpect)
     assert_type(expect(text).contains_all("x", "y"), StringExpect)
+    assert_type(expect(text).contains_in_order("x", "y"), StringExpect)
+    assert_type(expect(text).does_not_contain_in_order("x", "y"), StringExpect)
     assert_type(expect(text).does_not_contain_all("x", "y"), StringExpect)
     assert_type(expect(text).contains_any("x", "y"), StringExpect)
     assert_type(expect(text).does_not_contain_any("x", "y"), StringExpect)
@@ -173,6 +175,7 @@ def because_is_accepted_everywhere(text: str) -> None:
     assert_type(expect(text).is_empty(because="R"), StringExpect)
     assert_type(expect(text).contains("x", because="R"), StringExpect)
     assert_type(expect(text).contains_all("x", because="R"), StringExpect)
+    assert_type(expect(text).contains_in_order("x", because="R"), StringExpect)
     assert_type(expect(text).matches("x", because="R"), StringExpect)
     assert_type(expect(text).matches(is_short, because="R"), StringExpect)
 

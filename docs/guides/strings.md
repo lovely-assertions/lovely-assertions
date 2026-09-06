@@ -52,6 +52,58 @@ Expected hostname to contain all of ['db', 'api'], but 'db-01.internal' is missi
 expression — both needles, both haystacks — and leaves you to work out which
 half was false.
 
+### `contains_all` says nothing about order
+
+It is order-blind, which is right for what it claims and wrong for what a reader
+often means. A transcript that authenticated before it was ready satisfies it:
+
+```python
+from lovely_assertions import expect, AssertionFailure
+
+transcript = "connecting ... authenticated ... ready"
+expect(transcript).contains_all("connecting", "ready", "authenticated")
+print("passed, and the handshake was out of order")
+```
+
+```text
+passed, and the handshake was out of order
+```
+
+`contains_in_order` is the claim that reads the same and checks the order too:
+
+```python
+try:
+    expect(transcript).contains_in_order("connecting", "ready", "authenticated")
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected transcript to contain ['connecting', 'ready', 'authenticated'] in order, but 'authenticated' did not appear after 'ready': 'connecting ... authenticated ... ready'.
+```
+
+Anything at all may sit between the fragments, and each one consumes a span of
+its own — so the scan is **non-overlapping** the way counting is, and
+`contains_in_order("aa", "aa")` wants four `a` rather than three.
+
+The two ways it can break get two sentences, because they are two different bugs:
+
+```python
+log = "opened ... closed"
+try:
+    expect(log).contains_in_order("opened", "flushed")
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected log to contain ['opened', 'flushed'] in order, but 'flushed' was missing from 'opened ... closed'.
+```
+
+`does_not_contain_in_order` is the complement, and one missing fragment is enough
+to satisfy it — it does not ask for them to be absent, which is
+`does_not_contain_any`.
+
 Every one of them has a `does_not_*` complement. Case-insensitive variants exist
 for the single-needle forms only — `contains_ignoring_case` and
 `does_not_contain_ignoring_case` — not for `contains_all` or `contains_any`. For
