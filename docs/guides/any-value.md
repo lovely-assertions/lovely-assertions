@@ -283,6 +283,8 @@ uses it, which is usually the cheaper fix:
 ```python
 from lovely_assertions import expect, AssertionFailure
 
+order_id = "ord-118"
+
 
 def ends_with_999(value: str) -> bool:
     return value.endswith("999")

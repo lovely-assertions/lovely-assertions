@@ -248,6 +248,7 @@ def a_three_figure_sum(amount: int) -> bool:
 
 a_three_figure_sum.__name__ = "a three-figure sum"
 
+totals = {"eur": 40, "usd": 7}
 in_the_hundreds: dict[str, int] = {"eur": 40, "usd": matching(a_three_figure_sum)}
 try:
     expect(totals).is_equal_to(in_the_hundreds)

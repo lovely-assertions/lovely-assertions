@@ -25,8 +25,21 @@ Write the block, run the page, paste what came back.
 
 ## How a page runs
 
-- Blocks share the page's namespace in document order, so a later block can use
-  a name an earlier one bound.
+- Blocks share the page's namespace in document order **when the page runs**, so
+  a later block can use a name an earlier one bound.
+- **A type checker sees each block on its own**, carrying down only the imports
+  from the blocks above it. A reader copies one block rather than a page, and a
+  guide that defines `Colour` three times, once per example, is right to — so an
+  example binds the values it uses, and borrowing one from the block above is a
+  page to fix rather than a checker to appease. That split is what lets both
+  checkers read the pages: pyright tolerates a stitched page by re-narrowing to
+  the latest declaration, mypy keeps the first and reports every later use
+  against it, and no flag it offers changes that for a `def` or a `class`.
+- **Both checkers read every page**, for the reason the library is held to both:
+  each accepts things the other does not, and a reader runs whichever they run.
+  mypy reads them under a bare `--strict`; pyright is given a short licence for
+  what an example may be that a library module may not, and every entry in it was
+  removed in turn and put back only because a page then failed.
 - **Each page runs alone, in its own interpreter, from a real file on disk.** The
   separate process is why a page that registers a formatter does not quietly
   change the messages every page after it quotes — a failure would otherwise land
@@ -47,12 +60,13 @@ Write the block, run the page, paste what came back.
 - **The two are not flavours of one thing.** A `skip` block is left out of the
   execution, out of the type-check and out of the page's namespace, so a later
   block cannot use a name it bound. An `expect-error` block runs normally and its
-  quoted result is compared like any other's; only its lines are permitted to
-  fail the checker.
+  quoted result is compared like any other's; only that block is permitted to
+  fail a checker.
 - Neither directive is collected into a list, and nothing pins how many there
   are. Staleness is caught only in part: a `skip` on a block that was never going
-  to run anyway is refused, and an `expect-error` is refused once *nothing* the
-  page permits still errors. A `skip` on a `python` block that would now run
+  to run anyway is refused, and an `expect-error` is refused once the block it marks
+  stops erroring — asked of each checker separately, so a block one of them
+  still rejects cannot go on holding the licence for the other. A `skip` on a `python` block that would now run
   clean, or one of two `expect-error` blocks on the same page going quiet, is
   invisible. Deleting an exemption once its reason expires is discipline here,
   not a guard.

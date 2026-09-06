@@ -260,6 +260,8 @@ the string, `.which` carries on with the parsed `UUID`, and `.subject` hands tha
 ```python
 from uuid import UUID
 
+request_id = "5f1e3a4c-2b7d-4e91-a8c3-9d2f6b1a7e04"
+
 found = expect(request_id).is_uuid()
 found.which.is_instance_of(UUID)
 print(found.subject.version)
