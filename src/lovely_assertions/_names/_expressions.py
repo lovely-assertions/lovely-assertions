@@ -34,7 +34,7 @@ _MISSING = object()
 
 
 #: Calls that are known to build a subject regardless of what they resolve to.
-_ENTRY_POINTS = frozenset({"expect", "expect_raises"})
+_ENTRY_POINTS = frozenset({"expect", "expect_change", "expect_no_change", "expect_raises"})
 
 
 def subject_expression(frame: FrameType) -> str | None:

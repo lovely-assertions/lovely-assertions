@@ -65,9 +65,11 @@ from lovely_assertions import (
     WarnedExpect,
     exactly,
     expect,
+    expect_change,
     expect_raises,
     expect_warns,
 )
+from lovely_assertions._change import Change, NoChange, NumericChange
 from lovely_assertions._datetime import WithinDelta
 
 
@@ -209,6 +211,37 @@ def build_world(root: Path, /) -> World:
         called=called,
         uncalled=Mock(),
     )
+
+
+class _Counter:
+    """A value the change scopes can watch move. Module-level, so the helpers below share it."""
+
+    total = 0
+
+
+def _a_passing_change_to() -> None:
+    """One passing `expect_change(...).to(...)`, for the tables below.
+
+    The continuation is called *inside* the block rather than in the header, and
+    that is not a style choice. The allocation sweep measures an assertion by
+    replacing it with a stand-in and comparing; a stand-in over ``to`` returns
+    ``None``, and ``with expect_change(...).to(1):`` would then enter ``None``.
+    Written this way the block is entered first, so a stubbed ``to`` degrades to
+    the plain claim -- which still passes here -- and no scope is ever built and
+    dropped, which is what the finaliser exists to complain about.
+    """
+    _Counter.total = 0
+    with expect_change(lambda: _Counter.total) as scope:
+        scope.to(1)
+        _Counter.total = 1
+
+
+def _a_passing_change_by() -> None:
+    """One passing `expect_change(...).by(...)`; see :func:`_a_passing_change_to`."""
+    _Counter.total = 0
+    with expect_change(lambda: _Counter.total) as scope:
+        scope.by(1)
+        _Counter.total += 1
 
 
 def _linked(world: World, /) -> Path:
@@ -669,6 +702,8 @@ HAPPY_CALLS: Final[dict[tuple[str, str], Callable[[World], object]]] = {
         .is_within(timedelta(days=1))
         .before(datetime(2020, 1, 1, 12, tzinfo=UTC))
     ),
+    ("Change", "to"): lambda _: _a_passing_change_to(),
+    ("NumericChange", "by"): lambda _: _a_passing_change_by(),
     ("WithinDelta", "after"): lambda _: (
         expect(datetime(2020, 1, 1, 12, tzinfo=UTC))
         .is_within(timedelta(days=1))
@@ -828,7 +863,7 @@ NO_HAPPY_PATH: Final[dict[tuple[str, str], str]] = {
 
 
 def subject_classes() -> tuple[type, ...]:
-    """Every subject class in the package, exported or not, plus ``WithinDelta``.
+    """Every subject class in the package, exported or not, plus the four that are not one.
 
     Read off the package rather than listed, because a tuple of the exported
     classes leaves out the ones that are public in use and private in name.
@@ -839,9 +874,13 @@ def subject_classes() -> tuple[type, ...]:
     exactly the gap the two guards reading this table exist to close.
 
     So a subject class added tomorrow is walked whether or not it is exported and
-    whether or not anyone remembers this file. ``WithinDelta`` is the one thing
-    the derivation cannot reach: it is not an :class:`Expect` at all, but
-    ``is_within(...).before(...)`` is a public assertion, so it is named.
+    whether or not anyone remembers this file. What the derivation cannot reach is
+    the handful of public classes that are not :class:`Expect` subclasses at all,
+    so those are named: ``WithinDelta``, whose assertion is in
+    ``is_within(...).before(...)``, and the three change scopes, whose assertion
+    is the ``with`` block itself. Miss one and its methods are public assertions
+    with no exercise and no failing case -- exactly the gap the two guards reading
+    this table exist to close.
 
     A *seam* is left out. Every subject is assembled from one mixin per seam, and
     a mixin is an :class:`Expect` subclass like any other -- but it is never what
@@ -860,7 +899,13 @@ def subject_classes() -> tuple[type, ...]:
                 and not member.__name__.endswith("Assertions")
             ):
                 classes[member] = None
-    return (*sorted(classes, key=lambda cls: cls.__qualname__), WithinDelta)
+    return (
+        *sorted(classes, key=lambda cls: cls.__qualname__),
+        WithinDelta,
+        Change,
+        NoChange,
+        NumericChange,
+    )
 
 
 SUBJECT_CLASSES: Final = subject_classes()

@@ -1066,6 +1066,16 @@ EXTRAS: list[tuple[str, tuple[tuple[str, str, str], ...]]] = [
         ),
     ),
     (
+        "What an action changed",
+        (
+            ("_change/__init__.py", "function", "expect_change"),
+            ("_change/__init__.py", "function", "expect_no_change"),
+            ("_change/_scope.py", "class", "Change"),
+            ("_change/_numeric.py", "class", "NumericChange"),
+            ("_change/_scope.py", "class", "NoChange"),
+        ),
+    ),
+    (
         "How many times",
         (
             ("_occurrence/_protocol.py", "class", "Occurrence"),
