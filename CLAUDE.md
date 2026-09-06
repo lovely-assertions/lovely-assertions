@@ -55,9 +55,10 @@ These are what a change most often breaks, and none is visible from a single fil
   and every page under `docs/`.
 - **The documentation is executable.** Every `python` block on a hand-written
   page — all of `docs/` bar the generated reference, plus the repo's own
-  `README.md` — is run by `tests/test_documentation.py` and type-checked by a
-  second pyright pass, and every `text` block after one is compared against what
-  it produced. A page cannot drift from the library without failing the build.
+  `README.md` — is run by `tests/test_documentation.py` and, block by block,
+  type-checked by both pyright and mypy, and every `text` block after one is
+  compared against what it produced. A page cannot drift from the library
+  without failing the build.
 
 ## Architecture
 
@@ -196,8 +197,10 @@ implicitly below, spelled out as `--python` by the `quality-gate` skill.
   it, run the script), and `concepts/` (why it is built this way). Start from
   `docs/README.md`, which routes by reader.
 - **Writing a page**: a `python` block runs, sharing the page's namespace in
-  document order; a `text` block after one is its expected output — the failure
-  message if it raised, otherwise what it printed. Never quote a message you
+  document order, and is *type-checked on its own* with only the imports above
+  it carried down, so an example binds the values it uses; a `text` block after
+  one is its expected output — the failure message if it raised, otherwise what
+  it printed. Never quote a message you
   have not run. `bash` and `console` blocks are never executed. A block that
   cannot run is marked `<!-- docs-test: skip - why -->` on the line above the
   fence, and one a checker must *reject* `<!-- docs-test: expect-error - why -->`;

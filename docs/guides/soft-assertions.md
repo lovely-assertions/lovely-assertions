@@ -81,6 +81,8 @@ derived from the one that already happened. The block itself carries on:
 ```python
 from lovely_assertions import expect, soft_assertions, AssertionFailure
 
+server_config = {"host": "db-01", "port": 8080}
+
 try:
     with soft_assertions():
         expect(server_config).contains_key("hostname").whose_value.is_equal_to("web-01")

@@ -29,6 +29,7 @@ source: every message would fall back to ``the value``. The empty directory is
 what lets a page assert about a file that is not there.
 """
 
+import ast
 import json
 import os
 import re
@@ -73,13 +74,22 @@ _LINK: Final = re.compile(r"\[[^\]]*\]\((?P<target>[^)\s]+)\)")
 class Block:
     """One fenced block, with what precedes it on the page."""
 
-    __slots__ = ("body", "error_reason", "language", "skip_reason")
+    __slots__ = ("body", "error_reason", "language", "line", "skip_reason")
 
     def __init__(
-        self, language: str, body: str, skip_reason: str | None, error_reason: str | None
+        self,
+        language: str,
+        body: str,
+        line: int,
+        skip_reason: str | None,
+        error_reason: str | None,
     ) -> None:
         self.language = language
         self.body = body
+        #: The 1-based line the body starts on in the page, so a diagnostic can
+        #: name a place the reader can open rather than an offset into a module
+        #: that only ever existed inside this harness.
+        self.line = line
         self.skip_reason = skip_reason
         self.error_reason = error_reason
 
@@ -122,6 +132,7 @@ def blocks_of(page: Path) -> list[Block]:
             Block(
                 match.group("language"),
                 match.group("body"),
+                text.count("\n", 0, match.start("body")) + 1,
                 skip.group("reason") if skip else None,
                 expected.group("reason") if expected else None,
             )
@@ -363,22 +374,19 @@ def test_no_exemption_has_gone_stale() -> None:
 # The examples are type-checked, because typed discoverability is the product.
 # ---------------------------------------------------------------------------
 
-#: Suppressions for the artefacts of stitching a page's blocks into one module.
-#: Each block is written to be self-contained, so a page that defines ``Order``
-#: twice is two complete examples rather than a mistake -- and the imports repeat
-#: for the same reason. Nothing here relaxes a rule about the *library's* types.
-_STITCHING_ARTEFACTS: Final = {
-    "reportRedeclaration": "none",
-    "reportDuplicateImport": "none",
+#: What an example is allowed to be that a library module would not, and the
+#: whole of it: a block carries the import it was written under even where it
+#: does not use one, and pyright cannot always name a type the prose has just
+#: given. Nothing here relaxes a rule about the *library's* types, and mypy needs
+#: no counterpart -- it reads the pages under a bare ``--strict``.
+#:
+#: Every entry was removed in turn and put back only because a page then failed,
+#: so a licence that stops covering anything is one to delete rather than inherit.
+_EXAMPLE_LICENCE: Final = {
     "reportUnusedImport": "none",
-    "reportUnusedExpression": "none",
-    "reportMissingParameterType": "none",
-    "reportUnknownParameterType": "none",
-    "reportUnknownMemberType": "none",
+    "reportDuplicateImport": "none",
     "reportUnknownVariableType": "none",
     "reportUnknownArgumentType": "none",
-    "reportUnknownLambdaType": "none",
-    "reportMissingTypeStubs": "none",
 }
 
 
@@ -393,67 +401,246 @@ def _tool(name: str) -> str:
     return found
 
 
-def _as_module(page: Path) -> tuple[str, set[int]]:
-    """A page's runnable blocks as one module, and the lines allowed to error."""
-    lines: list[str] = []
-    permitted: set[int] = set()
-    for block in blocks_of(page):
+class Fragment:
+    """One runnable block, prepared to be type-checked on its own.
+
+    **A page is one session to the interpreter and a set of independent examples
+    to a checker, and that difference is deliberate.** Executing shares a
+    namespace, so a page reads top to bottom. Checking does not, because a reader
+    copies one block rather than a page -- and because a guide that defines
+    ``Colour`` three times, once per example, is correct documentation that no
+    single stitched module can represent. pyright tolerates the stitch by
+    re-narrowing to the latest declaration; mypy keeps the first and reports every
+    later use against it, and none of the redefinition flags it offers covers a
+    ``def`` or a ``class``. Checking per block is what lets both checkers read the
+    same pages without either one dictating how a page is written.
+    """
+
+    __slots__ = ("expects_error", "line", "module", "offset", "page", "source")
+
+    def __init__(self, module: str, source: str, page: Path, line: int, offset: int) -> None:
+        self.module = module
+        self.source = source
+        self.page = page
+        self.line = line
+        #: How many carried-forward import lines sit above the block's own first
+        #: line, so a diagnostic can be reported against the page.
+        self.offset = offset
+        self.expects_error = False
+
+    def where(self, reported: int) -> str:
+        """``page:line`` for a diagnostic reported at ``reported`` in the module."""
+        if reported <= self.offset:
+            return f"{self.page.name} (in the imports carried down to line {self.line})"
+        return f"{self.page.name}:{self.line + reported - self.offset - 1}"
+
+
+def _carried_imports(body: str) -> list[str]:
+    """The module-level import lines of a block, to carry down the page.
+
+    An import is a page's setup rather than an example's content: a guide imports
+    ``expect`` once at the top and everything below reads as a session. Carrying
+    the imports down is what lets a block be checked alone without asking every
+    example on the page to repeat the line -- which would be a worse page for a
+    checker's convenience.
+    """
+    lines = body.splitlines()
+    found: list[str] = []
+    for node in ast.parse(body).body:
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            found += lines[node.lineno - 1 : node.end_lineno]
+    return found
+
+
+def _as_fragments(page: Path) -> list[Fragment]:
+    """The page's runnable blocks, each a module of its own."""
+    imports: list[str] = []
+    found: list[Fragment] = []
+    stem = _module_name(page).removesuffix(".py")
+    for index, block in enumerate(blocks_of(page)):
         if not block.runnable:
             continue
-        body = block.body.rstrip("\n").splitlines()
-        if block.error_reason is not None:
-            permitted.update(range(len(lines) + 1, len(lines) + len(body) + 1))
-        lines += body
-    return "\n".join(lines) + "\n", permitted
+        body = block.body.rstrip("\n")
+        preamble = [line for line in imports if line not in body.splitlines()]
+        fragment = Fragment(
+            f"{stem}__{index:03d}.py",
+            "\n".join([*preamble, body]) + "\n",
+            page,
+            block.line,
+            len(preamble),
+        )
+        fragment.expects_error = block.error_reason is not None
+        found.append(fragment)
+        imports += _carried_imports(body)
+    return found
+
+
+def _fragments() -> dict[str, Fragment]:
+    """Every runnable block in the tree, keyed by the module it is checked as."""
+    return {
+        fragment.module: fragment
+        for page in pages()
+        for fragment in _as_fragments(page)
+        if fragment.source.strip()
+    }
+
+
+def _written(root: Path) -> dict[str, Fragment]:
+    """Write every fragment into ``root`` and return them."""
+    prepared = _fragments()
+    for fragment in prepared.values():
+        (root / fragment.module).write_text(fragment.source, encoding="utf-8")
+    return prepared
+
+
+def _pyright_errors(root: Path) -> dict[str, list[tuple[int, str]]]:
+    """Every pyright error over the written fragments, keyed by module name."""
+    (root / "pyrightconfig.json").write_text(
+        json.dumps(
+            {
+                "typeCheckingMode": "strict",
+                "pythonVersion": "3.13",
+                # Explicit, because pyright does not read `PYTHONPATH`: without
+                # this it resolves the package from whatever interpreter it
+                # happens to find, and a miss would report an import error on
+                # every page rather than a missing path once.
+                "extraPaths": [str(REPO_ROOT / "src")],
+                **_EXAMPLE_LICENCE,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(  # noqa: S603
+        [_tool("pyright"), "--outputjson", "--project", str(root), str(root)],
+        capture_output=True,
+        # `encoding` explicitly rather than the host default: pyright indents its
+        # continuation lines with U+00A0 and reports UTF-8 on every platform,
+        # which a Windows ANSI code page turns into mojibake.
+        text=True,
+        encoding="utf-8",
+        check=False,
+        env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:  # pragma: no cover - pyright crashed
+        pytest.fail(f"pyright produced no JSON.\nstdout:\n{result.stdout}\n{result.stderr}")
+    found: dict[str, list[tuple[int, str]]] = {}
+    for diagnostic in payload["generalDiagnostics"]:
+        if diagnostic["severity"] != "error":
+            continue
+        name = Path(diagnostic["file"]).name
+        found.setdefault(name, []).append(
+            (diagnostic["range"]["start"]["line"] + 1, diagnostic["message"].splitlines()[0])
+        )
+    return found
+
+
+#: One mypy diagnostic. ``--output=json`` exists but carries no severity that
+#: separates an error from a note, so the prefix is what has to be read.
+#:
+#: The file part is anchored on ``.py`` rather than left to stop at the first
+#: colon: mypy appends a column, and a span, to the line number when it is asked
+#: to, and a lazy split then swallows the line number into the filename. That
+#: fails *silently* -- the diagnostic is filed under a key nothing looks up, and
+#: a dropped diagnostic reads exactly like a clean page. Colour is stripped before
+#: a line reaches this, for that same reason: an escape sequence around ``error:``
+#: costs the whole line rather than part of it.
+_MYPY_ERROR: Final = re.compile(
+    r"^(?P<file>.+?\.py):(?P<line>\d+)(?::\d+)*: error: (?P<message>.*?)(?:  \[|$)"
+)
+
+
+#: An ANSI colour sequence, which a checker's human-facing output may carry and
+#: this one's parser must not trip over.
+_ANSI: Final = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _reported_module(path: str) -> str:
+    """The bare filename in a diagnostic, whichever platform wrote it.
+
+    ``Path`` splits on the separator of the interpreter running it, so a Windows
+    path read on any other system is one long name. The generated fragment names
+    hold no backslash of their own, so normalising is safe and lets one code path
+    serve both -- and lets a test pin both.
+    """
+    return path.replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def _mypy_run(root: Path) -> "subprocess.CompletedProcess[str]":
+    """Run mypy over the written fragments and hand back the whole result.
+
+    Kept apart from the parsing because silence is a legitimate answer -- clean
+    pages produce none -- so nothing in a parsed result can tell a clean tree
+    from a checker that never ran. The raw result is what tells them apart, and
+    :func:`test_each_checker_reports_a_fragment_it_must_reject` is what reads it.
+    """
+    return subprocess.run(  # noqa: S603
+        [
+            _tool("mypy"),
+            # None of the library's own configuration. The pages are checked
+            # under a bare `--strict`, and discovery would otherwise reach
+            # whatever `[tool.mypy]` the working directory happens to have --
+            # a dependency pyright does not have here, since it is handed a
+            # config of its own written into this same directory.
+            "--config-file=",
+            "--strict",
+            "--python-version",
+            "3.13",
+            # Module names repeat across pages, which is where an incremental
+            # run and this harness disagree about identity. It also means no
+            # cache is written, so none has to be pointed at a path that is a
+            # directory on one platform and a reserved device on another.
+            "--no-incremental",
+            "--no-error-summary",
+            "--hide-error-context",
+            # This repository's CI sets `FORCE_COLOR` for every step, and mypy
+            # honours it where the platform gives it a way to -- so the output
+            # read below arrives wrapped in escape sequences on some runners and
+            # not others. Asked off at the source, and stripped anyway when it
+            # is read, because what a colour code costs here is not a wrong
+            # answer but no answer.
+            "--no-color-output",
+            str(root),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        env={**os.environ, "MYPYPATH": str(REPO_ROOT / "src")},
+    )
+
+
+def _parsed_mypy(result: "subprocess.CompletedProcess[str]") -> dict[str, list[tuple[int, str]]]:
+    """The errors in a mypy result, keyed by module name."""
+    found: dict[str, list[tuple[int, str]]] = {}
+    for line in result.stdout.splitlines():
+        match = _MYPY_ERROR.match(_ANSI.sub("", line))
+        if match is None:
+            continue
+        found.setdefault(_reported_module(match.group("file")), []).append(
+            (int(match.group("line")), match.group("message"))
+        )
+    return found
+
+
+def _mypy_errors(root: Path) -> dict[str, list[tuple[int, str]]]:
+    """Every mypy error over the written fragments, keyed by module name."""
+    return _parsed_mypy(_mypy_run(root))
+
+
+#: Both checkers, run once over one written tree. Keyed by the name a test
+#: parametrises on, so a failure names the checker that rejected the example.
+CHECKERS: Final = ("pyright", "mypy")
 
 
 @pytest.fixture(scope="module")
-def checked() -> dict[str, list[tuple[int, str]]]:
-    """Every pyright error over the documentation, keyed by module name."""
+def checked() -> dict[str, dict[str, list[tuple[int, str]]]]:
+    """Every error each checker reports over the documentation, by checker."""
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
-        (root / "pyrightconfig.json").write_text(
-            json.dumps(
-                {
-                    "typeCheckingMode": "strict",
-                    "pythonVersion": "3.13",
-                    # Explicit, because pyright does not read `PYTHONPATH`: without
-                    # this it resolves the package from whatever interpreter it
-                    # happens to find, and a miss would report an import error on
-                    # every page rather than a missing path once.
-                    "extraPaths": [str(REPO_ROOT / "src")],
-                    **_STITCHING_ARTEFACTS,
-                }
-            ),
-            encoding="utf-8",
-        )
-        for page in pages():
-            source, _ = _as_module(page)
-            if source.strip():
-                (root / _module_name(page)).write_text(source, encoding="utf-8")
-        result = subprocess.run(  # noqa: S603
-            [_tool("pyright"), "--outputjson", "--project", str(root), str(root)],
-            capture_output=True,
-            # `encoding` explicitly rather than the host default: pyright indents
-            # its continuation lines with U+00A0 and reports UTF-8 on every
-            # platform, which a Windows ANSI code page turns into mojibake.
-            text=True,
-            encoding="utf-8",
-            check=False,
-            env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
-        )
-        try:
-            payload = json.loads(result.stdout)
-        except json.JSONDecodeError:  # pragma: no cover - pyright crashed
-            pytest.fail(f"pyright produced no JSON.\nstdout:\n{result.stdout}\n{result.stderr}")
-        found: dict[str, list[tuple[int, str]]] = {}
-        for diagnostic in payload["generalDiagnostics"]:
-            if diagnostic["severity"] != "error":
-                continue
-            name = Path(diagnostic["file"]).name
-            line = diagnostic["range"]["start"]["line"] + 1
-            found.setdefault(name, []).append((line, diagnostic["message"].splitlines()[0]))
-        return found
+        _written(root)
+        return {"pyright": _pyright_errors(root), "mypy": _mypy_errors(root)}
 
 
 def _module_name(page: Path) -> str:
@@ -468,45 +655,120 @@ def _module_name(page: Path) -> str:
     return "__".join(relative.with_suffix("").parts).replace("-", "_") + ".py"
 
 
+@pytest.mark.parametrize("checker", CHECKERS)
 @pytest.mark.parametrize("page", pages(), ids=lambda page: page.stem)
-def test_every_example_type_checks(page: Path, checked: dict[str, list[tuple[int, str]]]) -> None:
+def test_every_example_type_checks(
+    page: Path, checker: str, checked: dict[str, dict[str, list[tuple[int, str]]]]
+) -> None:
     """A page of examples a checker rejects would refute the library's own claim.
 
     Typed discoverability is the first thing this package sells, so an example
     that does not check is not a cosmetic problem -- it is the documentation
-    demonstrating the opposite of the pitch. A block that is *supposed* to be
-    rejected says so with ``docs-test: expect-error``.
+    demonstrating the opposite of the pitch. Both checkers read the pages, for the
+    reason the library itself is held to both: one of them alone accepts things
+    the other does not, and a reader runs whichever they run. A block that is
+    *supposed* to be rejected says so with ``docs-test: expect-error``.
     """
-    _, permitted = _as_module(page)
+    reported = checked[checker]
     unexpected = [
-        f"line {line}: {message}"
-        for line, message in checked.get(_module_name(page), [])
-        if line not in permitted
+        f"{fragment.where(line)}: {message}"
+        for fragment in _as_fragments(page)
+        if not fragment.expects_error
+        for line, message in reported.get(fragment.module, [])
     ]
     assert not unexpected, (
-        f"pyright rejects examples in {page.relative_to(REPO_ROOT)}:\n  "
+        f"{checker} rejects examples in {page.relative_to(REPO_ROOT)}:\n  "
         + "\n  ".join(unexpected)
         + "\nFix the example, or mark its block `<!-- docs-test: expect-error - why -->`."
     )
 
 
+@pytest.mark.parametrize("checker", CHECKERS)
 def test_no_expect_error_block_has_started_checking(
-    checked: dict[str, list[tuple[int, str]]],
+    checker: str, checked: dict[str, dict[str, list[tuple[int, str]]]]
 ) -> None:
     """An exemption that stopped covering an error is an exemption to delete.
 
     Without this, a block marked as deliberately unsound keeps its licence long
     after the unsoundness is gone -- and the next real error inside it is waved
-    through.
+    through. It is asked of each checker separately, so a block both are meant to
+    reject cannot go on being exempt because one of them still does.
     """
-    stale: list[str] = []
-    for page in pages():
-        _, permitted = _as_module(page)
-        if not permitted:
-            continue
-        erroring = {line for line, _ in checked.get(_module_name(page), [])}
-        if not permitted & erroring:
-            stale.append(str(page.relative_to(REPO_ROOT)))
+    reported = checked[checker]
+    stale = [
+        f"{fragment.page.relative_to(REPO_ROOT)}:{fragment.line}"
+        for fragment in _fragments().values()
+        if fragment.expects_error and not reported.get(fragment.module)
+    ]
     assert not stale, (
-        f"`docs-test: expect-error` on a block pyright now accepts: {stale}. Remove the directive."
+        f"`docs-test: expect-error` on a block {checker} now accepts: {stale}. "
+        f"Remove the directive, or mark the block for the checker that still rejects it."
     )
+
+
+def test_each_checker_reports_a_fragment_it_must_reject(tmp_path: Path) -> None:
+    """Both halves of this plumbing are read out of a checker's output.
+
+    pyright's JSON and mypy's ``file:line: error:`` lines are parsed here, and a
+    parser that quietly stopped matching reports nothing -- which is exactly what
+    a tree of clean pages looks like from the assertions above. So each checker is
+    handed an example it must reject, and a run that finds nothing in it fails
+    rather than passing every page for the wrong reason.
+    """
+    (tmp_path / "broken.py").write_text(
+        "from lovely_assertions import expect\n\nexpect(1).starts_with('x')\n", encoding="utf-8"
+    )
+
+    assert _pyright_errors(tmp_path).get("broken.py"), "pyright reported nothing on a bad example"
+
+    result = _mypy_run(tmp_path)
+
+    assert _parsed_mypy(result).get("broken.py"), (
+        f"mypy reported nothing on a bad example, exiting {result.returncode}. "
+        f"Silence here is indistinguishable from a clean tree, so what it said is "
+        f"the whole diagnosis.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
+
+
+def test_the_examples_are_actually_being_checked() -> None:
+    """A checker run over an empty tree passes every page and proves nothing.
+
+    A floor rather than a count, for the reason the page floor is one: examples
+    are added and moved. What it catches is the enumeration finding nothing --
+    a fence relabelled, a directive renamed, a block splitter that stopped
+    splitting.
+    """
+    prepared = _fragments()
+
+    assert len(prepared) >= 100, f"only {len(prepared)} checkable examples found across the docs"
+
+
+def test_the_mypy_parser_reads_every_shape_a_diagnostic_takes() -> None:
+    """A path this parser mis-splits is dropped, and a dropped error reads as clean.
+
+    That is the failure worth pinning rather than the parsing itself: filing a
+    diagnostic under a key nothing looks up is indistinguishable, from every
+    assertion above, from a page that type-checks. Windows writes a drive letter
+    and backslashes, and mypy appends a column -- and a span -- to the line
+    number when it is asked to, so all four shapes are pinned here instead of
+    being met for the first time on a platform this suite cannot run locally.
+    """
+    reported = [
+        "/checked/pages/page__000.py:3: error: bad  [attr-defined]",
+        "/checked/pages/page__001.py:3:11: error: bad  [attr-defined]",
+        r"C:\Temp\pytest-0\page__002.py:3: error: bad  [attr-defined]",
+        r"C:\Temp\pytest-0\page__003.py:3:11:3:24: error: bad  [attr-defined]",
+        # Copied from a Windows runner, where `FORCE_COLOR` reaches mypy and this
+        # is the shape every diagnostic arrived in.
+        (
+            "C:\\Temp\\pytest-0\\page__004.py:3: \x1b[1m\x1b[91merror:\x1b[0m "
+            "\x1b[0m\x1b[1mbad\x1b[0m  \x1b[0m\x1b[93m[attr-defined]\x1b[0m"
+        ),
+    ]
+
+    parsed = _parsed_mypy(
+        subprocess.CompletedProcess(["mypy"], 1, stdout="\n".join(reported), stderr="")
+    )
+
+    assert sorted(parsed) == [f"page__{index:03d}.py" for index in range(5)]
+    assert all(errors == [(3, "bad")] for errors in parsed.values())

@@ -222,6 +222,8 @@ it is.
 ### `IterableFormatter` — render a domain collection as its contents
 
 ```python
+from collections.abc import Iterator
+
 from lovely_assertions import expect, register_formatter, IterableFormatter, format_value
 
 
@@ -229,7 +231,7 @@ class OrderBook:
     def __init__(self, *orders: int) -> None:
         self.orders = list(orders)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[int]:
         return iter(self.orders)
 
 
