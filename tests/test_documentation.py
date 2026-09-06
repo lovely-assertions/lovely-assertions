@@ -543,10 +543,17 @@ def _pyright_errors(root: Path) -> dict[str, list[tuple[int, str]]]:
 #: colon: mypy appends a column, and a span, to the line number when it is asked
 #: to, and a lazy split then swallows the line number into the filename. That
 #: fails *silently* -- the diagnostic is filed under a key nothing looks up, and
-#: a dropped diagnostic reads exactly like a clean page.
+#: a dropped diagnostic reads exactly like a clean page. Colour is stripped before
+#: a line reaches this, for that same reason: an escape sequence around ``error:``
+#: costs the whole line rather than part of it.
 _MYPY_ERROR: Final = re.compile(
     r"^(?P<file>.+?\.py):(?P<line>\d+)(?::\d+)*: error: (?P<message>.*?)(?:  \[|$)"
 )
+
+
+#: An ANSI colour sequence, which a checker's human-facing output may carry and
+#: this one's parser must not trip over.
+_ANSI: Final = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def _reported_module(path: str) -> str:
@@ -587,6 +594,13 @@ def _mypy_run(root: Path) -> "subprocess.CompletedProcess[str]":
             "--no-incremental",
             "--no-error-summary",
             "--hide-error-context",
+            # This repository's CI sets `FORCE_COLOR` for every step, and mypy
+            # honours it where the platform gives it a way to -- so the output
+            # read below arrives wrapped in escape sequences on some runners and
+            # not others. Asked off at the source, and stripped anyway when it
+            # is read, because what a colour code costs here is not a wrong
+            # answer but no answer.
+            "--no-color-output",
             str(root),
         ],
         capture_output=True,
@@ -601,7 +615,7 @@ def _parsed_mypy(result: "subprocess.CompletedProcess[str]") -> dict[str, list[t
     """The errors in a mypy result, keyed by module name."""
     found: dict[str, list[tuple[int, str]]] = {}
     for line in result.stdout.splitlines():
-        match = _MYPY_ERROR.match(line)
+        match = _MYPY_ERROR.match(_ANSI.sub("", line))
         if match is None:
             continue
         found.setdefault(_reported_module(match.group("file")), []).append(
@@ -744,11 +758,17 @@ def test_the_mypy_parser_reads_every_shape_a_diagnostic_takes() -> None:
         "/checked/pages/page__001.py:3:11: error: bad  [attr-defined]",
         r"C:\Temp\pytest-0\page__002.py:3: error: bad  [attr-defined]",
         r"C:\Temp\pytest-0\page__003.py:3:11:3:24: error: bad  [attr-defined]",
+        # Copied from a Windows runner, where `FORCE_COLOR` reaches mypy and this
+        # is the shape every diagnostic arrived in.
+        (
+            "C:\\Temp\\pytest-0\\page__004.py:3: \x1b[1m\x1b[91merror:\x1b[0m "
+            "\x1b[0m\x1b[1mbad\x1b[0m  \x1b[0m\x1b[93m[attr-defined]\x1b[0m"
+        ),
     ]
 
     parsed = _parsed_mypy(
         subprocess.CompletedProcess(["mypy"], 1, stdout="\n".join(reported), stderr="")
     )
 
-    assert sorted(parsed) == [f"page__{index:03d}.py" for index in range(4)]
+    assert sorted(parsed) == [f"page__{index:03d}.py" for index in range(5)]
     assert all(errors == [(3, "bad")] for errors in parsed.values())
