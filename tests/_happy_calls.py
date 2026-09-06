@@ -346,6 +346,11 @@ HAPPY_CALLS: Final[dict[tuple[str, str], Callable[[World], object]]] = {
     ("OrderedExpect", "is_zero"): lambda _: expect(Decimal(0)).is_zero(),
     # -- StringExpect ------------------------------------------------------
     ("StringExpect", "contains"): lambda _: expect("abcabc").contains("a", occurrences=exactly(2)),
+    ("BytesExpect", "contains"): lambda _: expect(b"abc").contains(b"ab"),
+    ("BytesExpect", "does_not_contain"): lambda _: expect(b"abc").does_not_contain(b"zz"),
+    ("BytesExpect", "has_byte_at"): lambda _: expect(b"abc").has_byte_at(0, 0x61),
+    ("BytesExpect", "is_valid_utf8"): lambda _: expect(b"abc").is_valid_utf8(),
+    ("BytesExpect", "decoded_as"): lambda _: expect(b"abc").decoded_as("utf-8"),
     ("StringExpect", "contains_all"): lambda _: expect("abc").contains_all("a", "b"),
     ("StringExpect", "contains_in_order"): lambda _: expect("a-b-c").contains_in_order("a", "c"),
     ("StringExpect", "does_not_contain_in_order"): lambda _: expect(

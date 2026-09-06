@@ -829,6 +829,13 @@ send("welcome", to="ada@example.com")
 
 expect(send).was_called_with("welcome", to="grace@example.com")
 """,
+    "BytesExpect": """\
+from lovely_assertions import expect
+
+payload = b"GET /orders HTTP/1.1"
+
+expect(payload).contains(b"HTTP/2")
+""",
     "soft": """\
 from lovely_assertions import expect, soft_assertions
 
@@ -864,6 +871,7 @@ TARGETS: list[tuple[str, str, str]] = [
     ("_core/__init__.py", "Expect", "Expect[T]"),
     ("_bool.py", "BoolExpect", "BoolExpect"),
     ("_string/__init__.py", "StringExpect", "StringExpect"),
+    ("_bytes/__init__.py", "BytesExpect", "BytesExpect"),
     ("_ordered/_subject.py", "OrderedExpect", "OrderedExpect[T]"),
     ("_numeric/_subject.py", "NumericExpect", "NumericExpect"),
     ("_collection/__init__.py", "CollectionExpect", "CollectionExpect[E, C]"),
@@ -904,6 +912,11 @@ SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("_enum/_names.py", "NameAssertions", "Names"),
         ("_enum/_values.py", "ValueAssertions", "Values"),
         ("_enum/_flags.py", "FlagAssertions", "Flags (enum.Flag and enum.IntFlag only)"),
+    ),
+    "BytesExpect": (
+        ("_bytes/_base.py", "BytesBase", "What is inside"),
+        ("_bytes/_containment.py", "ByteContainmentAssertions", "What is inside"),
+        ("_bytes/_decoding.py", "DecodingAssertions", "As text"),
     ),
     "MockExpect": (
         ("_mock/_base.py", "MockBase", "How often"),
@@ -1042,7 +1055,8 @@ DISPATCH_ROWS: list[tuple[str, str, object, bool]] = [
     ("`str`", '`"hello"`, and any `str` subclass', "hello", True),
     ("`int | float`", "`3`, `3.5`, and their subclasses", 3, True),
     ("`Mapping[K, V]`", "`dict`, `OrderedDict`, `ChainMap`, `MappingProxyType`", {"a": 1}, True),
-    ("`Sequence[E]`", "`list`, `tuple`, `range`, `bytes`, `bytearray`", [1, 2], True),
+    ("`bytes`", "`bytes` only; `bytearray` and `memoryview` stay sequences", b"ab", True),
+    ("`Sequence[E]`", "`list`, `tuple`, `range`, `bytearray`", [1, 2], True),
     ("`Collection[E]`", "`set`, `frozenset`, and the three `dict` views", {1, 2}, True),
     ("`Callable[..., object]`", "a function, a lambda, a bound method", print, True),
     ("anything else", "`None`, a generator, a plain object", object(), True),
@@ -1168,7 +1182,7 @@ SUBJECT_INTRO: dict[str, str] = {
         "whole of it and adds the assertions that need one."
     ),
     "SequenceExpect": (
-        "Returned for a `Sequence` — `list`, `tuple`, `range`, `bytes` — parameterised by\n"
+        "Returned for a `Sequence` — `list`, `tuple`, `range`, `bytearray` — parameterised by\n"
         "the element type, so `expect(names).contains(3)` is a type error when `names` is\n"
         "a `Sequence[str]`. Everything here is an assertion that needs an order to mean\n"
         "anything; the rest of the catalogue is inherited from the collection subject."
@@ -1286,6 +1300,19 @@ SUBJECT_INTRO: dict[str, str] = {
         "`runtime_checkable`, a subject that is not a class — the assertion raises rather\n"
         "than reporting a failure it did not establish."
     ),
+    "BytesExpect": (
+        "Returned for a `bytes`, and it **extends** `SequenceExpect[int]` rather than\n"
+        'replacing it. `bytes` really is a sequence of integers — `b"abc"[0]` is `97` —\n'
+        "so every sequence assertion still applies and `contains(97)` still means what it\n"
+        "always did.\n"
+        "\n"
+        "What its own subject adds is the reading a `SequenceExpect[int]` cannot express:\n"
+        "`bytes` answers `in` for a *run* of bytes as well as for one, so `contains` is\n"
+        "widened rather than replaced. `decoded_as` is the other half — it hands back a\n"
+        "genuine `str`, so the whole string catalogue follows it.\n"
+        "\n"
+        "`bytearray` and `memoryview` are unchanged and still reach `SequenceExpect[int]`."
+    ),
     "MockExpect": (
         "Returned for a `unittest.mock` mock, ahead of everything else: a `MagicMock`\n"
         "defines `__len__`, `__iter__` and `__contains__`, so the collection subject would\n"
@@ -1377,7 +1404,14 @@ SUBJECT_OUTRO: dict[str, str] = {
 }
 
 SURPRISES: list[tuple[str, object, str]] = [
-    ('expect(b"abc")', b"abc", "`bytes` is a `Sequence[int]`, so the elements are integers."),
+    (
+        'expect(b"abc")',
+        b"abc",
+        (
+            "a `SequenceExpect[int]` with more on it: the elements really are"
+            " integers, and `in` also asks about a run of bytes."
+        ),
+    ),
     ("expect(range(3))", range(3), "a `range` is a sequence, and is not materialised."),
     (
         "expect({1, 2})",

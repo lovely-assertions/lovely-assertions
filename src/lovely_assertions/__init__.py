@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     # suppression is what stops `ruff --fix` from removing it -- without the alias
     # every name here answers `Any`.
     from lovely_assertions._bool import BoolExpect as BoolExpect
+    from lovely_assertions._bytes import BytesExpect as BytesExpect
     from lovely_assertions._callable import CallableExpect as CallableExpect
     from lovely_assertions._callable import RaisedExpect as RaisedExpect
     from lovely_assertions._callable import expect_raises as expect_raises
@@ -146,6 +147,7 @@ if TYPE_CHECKING:
 _HOME: dict[str, str] = {
     "AssertionFailure": "lovely_assertions._exceptions",
     "BoolExpect": "lovely_assertions._bool",
+    "BytesExpect": "lovely_assertions._bytes",
     "CallableExpect": "lovely_assertions._callable",
     "Change": "lovely_assertions._change",
     "CollectionExpect": "lovely_assertions._collection",
@@ -232,6 +234,7 @@ def __dir__() -> list[str]:
 __all__ = [
     "AssertionFailure",
     "BoolExpect",
+    "BytesExpect",
     "CallableExpect",
     "Change",
     "CollectionExpect",
