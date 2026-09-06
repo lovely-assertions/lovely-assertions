@@ -1176,3 +1176,84 @@ def test_passing_exception_assertions_never_touch_the_failure_path() -> None:
     with expect_raises(ValueError) as pending:
         boom()
     pending.with_message("bad")
+
+
+# ---------------------------------------------------------------------------
+# `returns()` -- the continuation that carries the return type
+# ---------------------------------------------------------------------------
+def test_returns_hands_back_what_the_call_produced() -> None:
+    def parse(text: str) -> int:
+        return int(text)
+
+    found = expect(lambda: parse("3")).returns()
+
+    assert found.subject == 3
+    found.which.is_equal_to(3)
+
+
+def test_returns_continues_back_to_the_callable() -> None:
+    expect(lambda: 3).returns().and_.does_not_raise()
+
+
+def test_returns_reports_an_exception_as_the_failure() -> None:
+    def boom() -> int:
+        raise ValueError("no")
+
+    with pytest.raises(AssertionFailure) as caught:
+        expect(boom).returns()
+
+    assert str(caught.value) == ("Expected boom to return, but raised ValueError('no').")
+    assert isinstance(caught.value.__cause__, ValueError)
+
+
+def test_returns_lets_a_base_exception_travel() -> None:
+    """A Ctrl-C crossing the call is the interpreter's business, as everywhere here."""
+
+    def interrupted() -> int:
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        expect(interrupted).returns()
+
+
+def test_returns_calls_the_subject_exactly_once() -> None:
+    """The family's documented contract: one call per link of the chain."""
+    calls = 0
+
+    def counted() -> int:
+        nonlocal calls
+        calls += 1
+        return calls
+
+    expect(counted).returns()
+    assert calls == 1
+
+    expect(counted).does_not_raise().returns()
+    assert calls == 3
+
+
+def test_returns_carries_a_falsy_result_like_any_other() -> None:
+    """`None` and `0` are results, not absences."""
+    expect(lambda: None).returns().which.is_none()
+    expect(lambda: 0).returns().which.is_equal_to(0)
+
+
+def test_because_attaches_to_the_sentence() -> None:
+    def boom() -> int:
+        raise ValueError("no")
+
+    with pytest.raises(AssertionFailure) as caught:
+        expect(boom).returns(because="the parser accepts this input")
+
+    assert str(caught.value).endswith("because the parser accepts this input.")
+
+
+def test_a_narrowing_failure_absorbs_the_rest_of_the_chain() -> None:
+    def boom() -> int:
+        raise ValueError("no")
+
+    with soft_assertions() as scope:
+        expect(boom).described_as("parse").returns().which.is_equal_to(3)
+        collected = scope.discard()
+
+    assert collected == ["Expected parse to return, but raised ValueError('no')."]

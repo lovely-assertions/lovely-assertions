@@ -392,6 +392,55 @@ as "this was not supposed to happen".
 exception through, so the test errors rather than fails. That is usually what you
 want, but it is worth knowing which of the two you are asking for.
 
+### `returns()` keeps the value, and its type
+
+`does_not_raise()` hands back the callable. `returns()` hands back what the call
+produced — typed as what the thunk returns rather than as `object`, which is the
+whole of why it exists:
+
+```python
+from lovely_assertions import expect
+
+
+def parse(text: str) -> int:
+    return int(text)
+
+
+expect(lambda: parse("3")).returns().which.is_equal_to(3)
+print("the value, and its type")
+```
+
+```text
+the value, and its type
+```
+
+`.which` descends into the value, `.and_` goes back to the callable, `.subject`
+hands it over raw. A failure reads as one:
+
+```python
+from lovely_assertions import AssertionFailure
+
+
+def load() -> dict[str, int]:
+    raise ValueError("no such file")
+
+
+try:
+    expect(load).returns()
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected load to return, but raised ValueError('no such file').
+```
+
+**Be honest about when to reach for it.** As an assertion it says little that
+`expect(parse("3")).is_equal_to(3)` does not, and the plain form reads better.
+It earns its place where the *call itself* is what the test is about — a thunk
+you are already asserting on for other reasons, and whose result you then want to
+inspect without losing its type on the way.
+
 ## Gotchas
 
 ### A `BaseException` that is not an `Exception` passes through
