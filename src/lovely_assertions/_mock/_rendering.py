@@ -96,27 +96,37 @@ def render_calls(recorded: "Sequence[Any]", options: "FormattingOptions", /) -> 
     return "[" + ", ".join(shown) + "]"
 
 
-def last_clause(total: int, /) -> str:
+def last_clause(total: int, verb: str, /) -> str:
     """``"called with"`` for a single call, ``"last called with"`` for several.
 
     "last called with" in front of the only call there is reads as though the
     assertion had ignored the others, which is the very confusion these messages
     exist to remove.
+
+    ``verb`` is ``"called"`` or ``"awaited"``. It is a parameter rather than two
+    functions because the rule above is about the *shape* of the sentence and
+    holds whichever list is being described -- and a second copy of it is a
+    second place for the await side to drift into wording the call side does not
+    use.
     """
     if total == 1:
-        return "called with"
-    return "last called with"
+        return verb + " with"
+    return "last " + verb + " with"
 
 
-def call_numbers(indices: list[int], options: "FormattingOptions", /) -> str:
-    """``"call 2"`` or ``"calls 1 and 3"`` -- the calls a note is about.
+def numbered(indices: list[int], options: "FormattingOptions", noun: str, /) -> str:
+    """``"call 2"`` or ``"calls 1 and 3"`` -- the entries a note is about.
 
     Numbered from one and in the order they were made, which is the order the
     listing beside them prints, so "call 2" can be counted off it. Truncated like
     every other listing: a mock called a thousand times must not put a thousand
     numbers in a message.
+
+    ``noun`` is the singular -- ``"call"`` or ``"await"`` -- and this function
+    owns the plural, so the two sides cannot disagree about how a run of them is
+    written.
     """
-    noun = "call " if len(indices) == 1 else "calls "
+    noun = noun + " " if len(indices) == 1 else noun + "s "
     limit = options.max_items
     shown = [str(index) for index in indices[:limit]]
     elided = len(indices) - len(shown)

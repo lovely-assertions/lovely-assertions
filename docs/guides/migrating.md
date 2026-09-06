@@ -111,6 +111,51 @@ b)` maps straight across, and a suite written in the JUnit habit —
 
 `equivalency` is imported from `lovely_assertions` alongside `expect`.
 
+### From `unittest.mock`
+
+| `unittest.mock` | Here |
+|---|---|
+| `assert_called()` | `was_called()` |
+| `assert_not_called()` | `was_not_called()` |
+| `assert_called_once()` | `was_called_once()` |
+| `assert_called_with(...)` | `was_called_with(...)` |
+| `assert_called_once_with(...)` | `was_called_once_with(...)` |
+| `assert_any_call(...)` | `was_ever_called_with(...)` |
+| `assert_has_calls([...])` | `.calls.contains_in_order(...)` |
+| `mock.call_count == n` | `has_call_count(n)` |
+| — | `was_never_called_with(...)`, which `unittest.mock` cannot express |
+| `assert_awaited()` | `was_awaited()` |
+| `assert_not_awaited()` | `was_not_awaited()` |
+| `assert_awaited_once()` | `was_awaited_once()` |
+| `assert_awaited_with(...)` | `was_awaited_with(...)` |
+| `assert_awaited_once_with(...)` | `was_awaited_once_with(...)` |
+| `assert_any_await(...)` | `was_ever_awaited_with(...)` |
+| `assert_has_awaits([...])` | `.awaits.contains_in_order(...)` |
+| `mock.await_count == n` | `has_await_count(n)` |
+| — | `was_never_awaited_with(...)`, likewise |
+
+The rows are named to read as expectations rather than commands. Four
+differences are worth knowing before you rely on the translation.
+
+**A misspelling is an `AttributeError`** on the line that wrote it, rather than a
+silent pass — `unittest.mock` catches a denylist of typos and lets a name
+borrowed from another framework through.
+
+**The two `has_*` rows are not exact.** `assert_has_calls` accepts a
+*non-contiguous* subsequence of `mock_calls`, which includes calls made to the
+mock's children; `.calls.contains_in_order(...)` walks this mock's own calls and
+says which position broke the order. Where you relied on child calls being
+counted, assert on `expect(parent.mock_calls)` instead.
+
+**`assert_called_once_with` fails three different ways and explains two of
+them.** Never called and called-more-than-once both report one sentence about the
+count; called-once-with-the-wrong-arguments reports `expected call not found`
+with an Expected/Actual pair. None of the three says which of several calls
+matched, or which single argument differed. Each gets its own message here.
+
+**The await rows live on [a subject of their own](mocks.md#async-mocks)**, so a
+plain `Mock` does not offer them at all.
+
 ## From `assertpy`
 
 The same fluent shape, under some different names.

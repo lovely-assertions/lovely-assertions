@@ -36,6 +36,7 @@ from typing import Any, Final, cast
 import pytest
 
 from lovely_assertions import (
+    AsyncMockExpect,
     CallableExpect,
     CollectionExpect,
     DateExpect,
@@ -478,12 +479,41 @@ def test_no_mock_spelling_has_the_type_of_a_built_in() -> None:
     assert type(patched) is not int, "...while `type()` still reads a mock class"
 
 
-def test_every_mock_still_reaches_the_mock_subject() -> None:
-    """The other half: no mock spelling may lose its subject to the table in front."""
+def test_every_mock_still_reaches_the_mock_family() -> None:
+    """The other half: no mock spelling may lose its subject to the table in front.
+
+    ``issubclass`` rather than ``is``, because the family has two members: a mock
+    that records awaits gets :class:`AsyncMockExpect`, which *is* a
+    :class:`MockExpect` with one more catalogue on it. What this guard is about is
+    the table in front -- a ``MagicMock`` defines ``__len__``, ``__iter__`` and
+    ``__contains__``, and ``create_autospec(dict)`` is a mock of a registered
+    type -- so reaching the family is the whole claim. Which member is the next
+    test's business.
+    """
     from unittest.mock import AsyncMock, MagicMock, Mock, NonCallableMock, create_autospec
 
     for mock in (Mock(), MagicMock(), AsyncMock(), NonCallableMock(), create_autospec(dict)):
-        assert built_by(mock) is MockExpect, f"{type(mock).__name__} lost its subject"
+        built = built_by(mock)
+        assert built is not None, f"{type(mock).__name__} reached no subject at all"
+        assert issubclass(built, MockExpect), f"{type(mock).__name__} lost its subject"
+
+
+def test_only_a_mock_that_records_awaits_gets_the_async_subject() -> None:
+    """Which member of the family, and it is decided by the class rather than the instance.
+
+    A plain ``Mock`` answers ``await_args_list`` -- with a child mock -- so an
+    instance-level check would hand the await catalogue to every mock and let it
+    compare against that child. Both directions are pinned, since a guard that
+    only checked the async side would stay green if the check claimed everything.
+    """
+    from unittest.mock import AsyncMock, MagicMock, Mock
+
+    async def work() -> None: ...
+
+    assert built_by(AsyncMock()) is AsyncMockExpect
+    assert built_by(Mock(spec=work)) is AsyncMockExpect
+    assert built_by(Mock()) is MockExpect
+    assert built_by(MagicMock()) is MockExpect
 
 
 def test_a_registered_type_still_loses_to_a_mock_of_it() -> None:

@@ -12,7 +12,7 @@ from lovely_assertions._exceptions import hide_internal_frames
 from lovely_assertions._mock._call_matching import matches_call
 from lovely_assertions._mock._rendering import (
     INDENT,
-    call_numbers,
+    numbered,
     render_options,
 )
 
@@ -60,7 +60,11 @@ def _deepen(block: str, /) -> str:
 
 
 def earlier_matches_note(
-    recorded: "Sequence[Any]", args: "tuple[object, ...]", kwargs: "Mapping[str, object]", /
+    recorded: "Sequence[Any]",
+    args: "tuple[object, ...]",
+    kwargs: "Mapping[str, object]",
+    noun: str,
+    /,
 ) -> str:
     """Name the earlier calls that matched, when ``was_called_with`` failed on the last.
 
@@ -69,6 +73,9 @@ def earlier_matches_note(
     hunting for a call that is right there in the recording -- it was simply not
     the last one, and that is a fact about the assertion rather than about the
     code under test.
+
+    ``noun`` is ``"call"`` or ``"await"``: the same trap catches the await side,
+    where the last await is the only one :meth:`was_awaited_with` looks at.
     """
     matched = [
         index for index, one in enumerate(recorded[:-1], 1) if matches_call(one, args, kwargs)
@@ -79,14 +86,20 @@ def earlier_matches_note(
     return (
         "\n"
         + INDENT
-        + call_numbers(matched, options)
+        + numbered(matched, options, noun)
         + (" was" if len(matched) == 1 else " were")
-        + " made with those arguments; only the last call is checked"
+        + " made with those arguments; only the last "
+        + noun
+        + " is checked"
     )
 
 
 def which_matched(
-    recorded: "Sequence[Any]", args: "tuple[object, ...]", kwargs: "Mapping[str, object]", /
+    recorded: "Sequence[Any]",
+    args: "tuple[object, ...]",
+    kwargs: "Mapping[str, object]",
+    noun: str,
+    /,
 ) -> str:
     """Which of several calls matched, for a failed ``was_called_once_with``.
 
@@ -94,22 +107,31 @@ def which_matched(
     called the right thing three times when it should have called it once, or it
     called three different things and none of them was right. This line says
     which.
+
+    ``noun`` is ``"call"`` or ``"await"``, since the same two bugs are
+    indistinguishable on the await side for the same reason.
     """
     matched = [index for index, one in enumerate(recorded, 1) if matches_call(one, args, kwargs)]
     options = render_options()
     if not matched:
-        return "\n" + INDENT + "none of those calls was made with those arguments"
+        return "\n" + INDENT + "none of those " + noun + "s was made with those arguments"
     return (
         "\n"
         + INDENT
-        + call_numbers(matched, options)
+        + numbered(matched, options, noun)
         + (" was" if len(matched) == 1 else " were")
-        + " made with those arguments; it is the call count that is wrong"
+        + " made with those arguments; it is the "
+        + noun
+        + " count that is wrong"
     )
 
 
 def nearest_note(
-    recorded: "Sequence[Any]", args: "tuple[object, ...]", kwargs: "Mapping[str, object]", /
+    recorded: "Sequence[Any]",
+    args: "tuple[object, ...]",
+    kwargs: "Mapping[str, object]",
+    noun: str,
+    /,
 ) -> str:
     """Explain the recorded call that came closest to the one that was expected.
 
@@ -129,7 +151,16 @@ def nearest_note(
     difference = describe_call_difference(recorded[nearest], args, kwargs)
     if not difference:
         return ""
-    return "\n" + INDENT + "the closest was call " + str(nearest + 1) + ":" + _deepen(difference)
+    return (
+        "\n"
+        + INDENT
+        + "the closest was "
+        + noun
+        + " "
+        + str(nearest + 1)
+        + ":"
+        + _deepen(difference)
+    )
 
 
 def distance(

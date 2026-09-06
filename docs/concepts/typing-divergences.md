@@ -38,7 +38,7 @@ typeshed puts an `Any` in `NonCallableMock`'s MRO, so every concrete overload of
 [Typed dispatch](typed-dispatch.md#the-one-place-the-two-halves-do-not-agree)
 demonstrates it.
 
-**Decision:** ship no static overload, and dispatch to `MockExpect` at runtime
+**Decision:** ship no static overload, and dispatch to a mock subject at runtime
 anyway — the one place the two tables deliberately disagree. An overload written
 for mocks is reached only by leading the chain, where it overlaps most of the
 others and draws a `reportOverlappingOverload` per pair. Those suppressions would
@@ -46,6 +46,16 @@ pay only where a parameter is *declared* `Mock` — which in a real suite it oft
 is not, a mock usually arriving from a fixture or an inferred assignment.
 `expect(mock, as_=MockExpect)` is the typed route — see
 [Mocks](../guides/mocks.md).
+
+**The runtime answers two subjects, not one.** A mock that records awaits gets
+`AsyncMockExpect` and every other mock gets `MockExpect`, and no checker can see
+which — so the split between the two catalogues is enforced statically *only*
+through `as_=`. That makes naming the subject worth more here than anywhere else
+in the library: written as `expect(fetch)`, both the await assertions and their
+absence on a synchronous mock are invisible to a checker. The residual cost is
+that `expect(sync_mock, as_=AsyncMockExpect)` type-checks; it is refused at
+runtime rather than silently passing, which is the best available answer when the
+static side has nothing to say.
 
 `NotImplemented` is the second value with this property, found by sweeping exotic
 subjects through both checkers and diffing the answers against the runtime.

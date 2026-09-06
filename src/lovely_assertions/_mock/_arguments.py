@@ -17,8 +17,8 @@ from lovely_assertions._mock._differences import (
     which_matched,
 )
 from lovely_assertions._mock._rendering import (
-    call_numbers,
     last_clause,
+    numbered,
     render_call,
     render_calls,
     render_options,
@@ -67,9 +67,10 @@ class ArgumentAssertions(MockBase):
             )
         return self._fail(
             f"to have been called with {wanted(args, kwargs)},"
-            f" but was {last_clause(len(recorded))} {render_call(recorded[-1], render_options())}"
+            f" but was {last_clause(len(recorded), 'called')}"
+            f" {render_call(recorded[-1], render_options())}"
             + describe_call_difference(recorded[-1], args, kwargs)
-            + earlier_matches_note(recorded, args, kwargs),
+            + earlier_matches_note(recorded, args, kwargs, "call"),
             because,
         )
 
@@ -100,7 +101,7 @@ class ArgumentAssertions(MockBase):
             )
         return self._fail(
             f"to have been called once with {wanted(args, kwargs)},"
-            f" but {self._how_it_was_called()}" + which_matched(recorded, args, kwargs),
+            f" but {self._how_it_was_called()}" + which_matched(recorded, args, kwargs, "call"),
             because,
         )
 
@@ -132,7 +133,8 @@ class ArgumentAssertions(MockBase):
         return self._fail(
             f"to have been called with {wanted(args, kwargs)} at some point,"
             f" but none of its {count_of(len(recorded), 'call')} was:"
-            f" {render_calls(recorded, render_options())}" + nearest_note(recorded, args, kwargs),
+            f" {render_calls(recorded, render_options())}"
+            + nearest_note(recorded, args, kwargs, "call"),
             because,
         )
 
@@ -159,7 +161,7 @@ class ArgumentAssertions(MockBase):
         options = render_options()
         return self._fail(
             f"never to have been called with {wanted(args, kwargs)},"
-            f" but {call_numbers(matched, options)}"
+            f" but {numbered(matched, options, 'call')}"
             f" {'was' if len(matched) == 1 else 'were'}:"
             f" {render_calls(recorded, options)}",
             because,

@@ -1,8 +1,9 @@
 # Mocks
 
-`expect(some_mock, as_=MockExpect)` gives you a `MockExpect`. Two reasons to
-prefer it over `unittest.mock`'s own assertions: **a misspelling is caught**, and
-**the failure says which call was wrong**.
+`expect(some_mock, as_=MockExpect)` gives you a `MockExpect`. Three reasons to
+prefer it over `unittest.mock`'s own assertions: **a misspelling is caught**,
+**the failure says which call was wrong**, and — for an `AsyncMock` —
+**a coroutine nobody awaited stops passing silently**.
 
 > **Write `as_=MockExpect`.** A plain `expect(fetch)` builds the right subject at
 > runtime, and every example here would work without it — but a type checker
@@ -11,7 +12,8 @@ prefer it over `unittest.mock`'s own assertions: **a misspelling is caught**, an
 > Naming the subject class costs one keyword and keeps your suite green under a
 > strict checker.
 
-> Full signatures: [`MockExpect`](../reference/assertions.md#mockexpect).
+> Full signatures: [`MockExpect`](../reference/assertions.md#mockexpect) and
+> [`AsyncMockExpect`](../reference/assertions.md#asyncmockexpect).
 
 ## The catalogue
 
@@ -199,6 +201,180 @@ Expected fetch to have been called with ('/nope') at some point, but none of its
       first difference at index 0: '/users' instead of '/nope'
 ```
 
+## Async mocks
+
+An `AsyncMock` records two different things, and a test almost always means the
+second. *Calling* it appends to the call recording and hands back a coroutine;
+*awaiting* that coroutine is what runs the body and appends to the await
+recording.
+
+Code that builds a coroutine and drops it — a missing `await`, a task nobody
+gathered, a `TaskGroup` that exited before the work started — leaves the first
+recording full and the second empty. Every assertion about **calls** passes in
+that state, here and in `unittest.mock` both:
+
+```python
+from unittest.mock import AsyncMock
+
+from lovely_assertions import expect, MockExpect
+
+publish = AsyncMock()
+publish("order.placed")  # the coroutine is built, and nobody awaits it
+
+expect(publish, as_=MockExpect).was_called_once_with("order.placed")
+print("passed, and the work never ran")
+```
+
+```text
+passed, and the work never ran
+```
+
+That is not wrong — it *was* called. It is simply not what the test meant, and
+nothing in the call catalogue can say so. `AsyncMockExpect` is the other half:
+
+```python
+from unittest.mock import AsyncMock
+
+from lovely_assertions import expect, AsyncMockExpect, AssertionFailure
+
+publish = AsyncMock()
+publish("order.placed")
+
+try:
+    expect(publish, as_=AsyncMockExpect).was_awaited()
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected publish to have been awaited, but it was called once with ('order.placed') and never awaited.
+```
+
+Compare what `unittest.mock` prints for that same state:
+
+```python
+from unittest.mock import AsyncMock
+
+publish = AsyncMock()
+publish("order.placed")
+
+try:
+    publish.assert_awaited_once()
+except AssertionError as failure:
+    print(failure)
+```
+
+```text
+Expected mock to have been awaited once. Awaited 0 times.
+```
+
+It never mentions that the mock *was* called, or with what — which is the entire
+bug. It prints the same sentence for a mock that was never called at all, so the
+two failures a reader most needs to tell apart look identical.
+
+### The await catalogue
+
+`expect()` hands you an `AsyncMockExpect` for anything that records awaits: an
+`AsyncMock`, a `Mock(spec=some_async_function)`, or the async members of an
+autospecced class. It is a `MockExpect` with one more catalogue on it, so
+everything in the table above still applies.
+
+| | Asserts |
+|---|---|
+| `was_awaited()` | at least once |
+| `was_not_awaited()` | never — and passes for a mock that was never called |
+| `was_awaited_once()` | exactly once, any arguments |
+| `was_awaited_with(...)` | the **last** await used these arguments |
+| `was_awaited_once_with(...)` | awaited exactly once, with these |
+| `was_ever_awaited_with(...)` | **some** await used these |
+| `was_never_awaited_with(...)` | no await did |
+| `has_await_count(n)` | awaited exactly `n` times — or takes an [occurrence](occurrences.md) |
+| `.awaits` | a sequence subject over every recorded await |
+| `.last_await()` | asserts there was one, and continues on it with `.which` |
+
+The two counts can disagree, and that they can is the point:
+
+```python
+import asyncio
+from unittest.mock import AsyncMock
+
+from lovely_assertions import expect, AsyncMockExpect, AssertionFailure
+
+publish = AsyncMock()
+
+
+async def drain() -> None:
+    await publish("a")
+    await publish("b")
+    publish("c")  # built, never awaited
+
+
+asyncio.run(drain())
+
+expect(publish, as_=AsyncMockExpect).has_call_count(3).has_await_count(2)
+
+try:
+    expect(publish, as_=AsyncMockExpect).has_await_count(3)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected publish to have been awaited exactly 3 times, but it was awaited 2 times: [('a'), ('b')].
+```
+
+`was_never_awaited_with` is worth a second look. Its call-side twin fails on a
+dry run that *builds* the forbidden request; this one passes, because no work was
+done — which is usually the honest answer.
+
+### Dropping a coroutine warns, and that is worth keeping
+
+Every example above builds a coroutine and never awaits it, which is the state
+under test — and Python says so, on stderr, whenever the garbage collector gets
+to one:
+
+```text
+RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+```
+
+That warning is CPython's, not the library's, and it fires wherever the collector
+happens to run rather than on the line that caused it. In a suite that turns
+warnings into errors it will land on an unrelated test. Where you are
+deliberately constructing this state, close the coroutine — `publish("x").close()`
+— which changes nothing the mock recorded and keeps the warning off your other
+tests.
+
+Treat the warning as a second signal rather than noise: on a test you did *not*
+mean to write this way, it is telling you the same thing `was_awaited` would.
+
+### A plain `Mock` has no await assertions
+
+That is deliberate, and it is enforced by both type checkers rather than by a
+runtime guard. A synchronous `Mock` keeps no await recording — and because a mock
+answers every attribute with a child mock, an await assertion pointed at one
+would compare against that child and *pass*. So the catalogue lives on the
+subject that can answer it:
+
+<!-- docs-test: expect-error - a Mock subject has no await assertions, which is the point of the section -->
+
+```python
+from unittest.mock import Mock
+
+from lovely_assertions import expect, MockExpect
+
+try:
+    expect(Mock(), as_=MockExpect).was_awaited()
+except AttributeError as error:
+    print(error)
+```
+
+```text
+'MockExpect' object has no attribute 'was_awaited'
+```
+
+Both checkers reject that line, and at runtime it is an `AttributeError` on the
+line that wrote it — exactly as a misspelling is.
+
 ## Asserting on the calls themselves
 
 `.calls` gives you a [sequence subject](sequences.md) over the recorded calls, so
@@ -285,6 +461,28 @@ helps where a parameter is *declared* `Mock`. The full reasoning is in
 
 **`expect(fetch, as_=MockExpect)` is the typed route**, and it is what every
 example on this page uses.
+
+The same holds for `AsyncMockExpect`, and there it costs more than tidiness:
+naming the subject is the *only* place a checker sees that a synchronous `Mock`
+has no `was_awaited`. Written as `expect(fetch)`, both the await assertions and
+their absence are invisible to it.
+
+### `as_=AsyncMockExpect` on a synchronous mock is refused, not answered
+
+`as_=` overrides inference, and **no checker can refuse it here**: the subject's
+value is `Any`, so pointing the async subject at a plain `Mock` type-checks. The
+runtime will not answer it either, which is the point — a mock replies to every
+attribute, so `await_args_list` on a synchronous one is a child mock standing in
+for a list, and an assertion that merely tested it for truth would pass having
+compared nothing.
+
+Every await assertion reads that recording's *length* rather than its truth, so
+the misuse surfaces instead: a `Mock` has no `__len__` and you get a `TypeError`,
+a `MagicMock` answers `0` and the assertion fails. Neither is a silent green.
+
+The lesson generalises — `as_=` is a claim you are making, not one the library
+verifies. It is the same trade `register()` makes, and the reason `expect()`'s own
+inference is the route to prefer wherever your annotations reach.
 
 ### No signature normalisation
 

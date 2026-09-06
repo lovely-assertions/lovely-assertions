@@ -24,6 +24,7 @@ import pytest
 
 from lovely_assertions import (
     AssertionFailure,
+    AsyncMockExpect,
     BoolExpect,
     BytesExpect,
     CollectionExpect,
@@ -378,17 +379,24 @@ def test_a_mock_dispatches_to_the_mock_subject_at_runtime() -> None:
     overload always wins. The static answer for a mock is therefore meaningless
     whatever is written, so the runtime is left to be right on its own and
     ``expect(mock, as_=MockExpect)`` is the typed route.
+
+    The family has two members, and which one a mock gets is decided at runtime
+    too: a mock that records awaits reaches :class:`AsyncMockExpect`, a subclass
+    carrying the await catalogue on top of this one. That split is the sharpest
+    consequence of the paragraph above -- a checker cannot see it through
+    ``expect()`` at all, so ``as_=`` is not a convenience there but the only place
+    the distinction is enforced statically.
     """
     from unittest.mock import AsyncMock, MagicMock, Mock, NonCallableMock, create_autospec
 
-    for label, value in [
-        ("Mock", Mock()),
-        ("MagicMock", MagicMock()),
-        ("AsyncMock", AsyncMock()),
-        ("NonCallableMock", NonCallableMock()),
-        ("create_autospec(fn)", create_autospec(len)),
+    for label, value, expected in [
+        ("Mock", Mock(), MockExpect),
+        ("MagicMock", MagicMock(), MockExpect),
+        ("AsyncMock", AsyncMock(), AsyncMockExpect),
+        ("NonCallableMock", NonCallableMock(), MockExpect),
+        ("create_autospec(fn)", create_autospec(len), MockExpect),
     ]:
-        assert type(expect(value)) is MockExpect, f"{label} did not reach MockExpect"
+        assert type(expect(value)) is expected, f"{label} did not reach {expected.__name__}"
 
 
 def test_not_implemented_is_the_other_value_assignable_to_everything() -> None:
