@@ -27,6 +27,19 @@ __tracebackhide__ = hide_internal_frames
 _IMMUTABLE: Final = "matchers are immutable values; cannot change "
 
 
+#: The name the equivalence engine looks for to recognise a matcher.
+#:
+#: A *string* rather than an import, because that engine knows nothing about this
+#: package and the design depends on it staying that way: nothing in the library
+#: has to know matchers exist for one to work. The same shape, and the same
+#: reason, as the marker attributes ``_mock._recognition`` looks for -- read off
+#: the class with ``getattr``, so no import edge appears in either direction.
+#:
+#: Spelled ``_like_this_`` so that a reader meeting it takes it for what it is:
+#: machinery, not a field. See :class:`Matcher` on why that spelling matters.
+MATCHER_MARKER: Final = "_stands_for_a_value_"
+
+
 class Matcher:
     """Everything the matchers share -- which is not the match itself.
 
@@ -78,13 +91,22 @@ class Matcher:
 
     It really is machinery rather than state: a matcher has no fields anybody
     would want compared, and comparing two of them field by field is precisely
-    the reading :meth:`__eq__` exists to override. The tidier fix lives one module
-    over -- ``_equivalence._is_opaque`` naming matchers outright, the way it
-    already names classes and enum members -- and this file cannot make it, so the
-    naming convention here is load-bearing rather than decorative.
+    the reading :meth:`__eq__` exists to override.
+
+    The equivalence engine now names matchers outright, the way it already names
+    classes and enum members, so that spelling is belt to this braces rather than
+    the only thing holding the message together. Keep it anyway: it costs nothing,
+    it says what the slot is to anyone reading this file, and a matcher whose
+    fields were plainly named would be a record to any *other* reader of
+    ``__slots__``.
     """
 
     __slots__ = ()
+
+    #: Read by the equivalence engine through :data:`MATCHER_MARKER`, off the
+    #: class rather than the instance. A class attribute and not a slot, so it
+    #: adds nothing to a matcher's size and cannot be read as a field.
+    _stands_for_a_value_: Final = True
 
     def matches(self, value: object, /) -> bool:
         """Whether this matcher stands in for ``value``. Every matcher overrides it.

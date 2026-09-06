@@ -32,6 +32,7 @@ cannot see it at all. ``typing_tests/positive/matching.py`` and
 
 import copy
 import math
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final, cast
@@ -1009,3 +1010,178 @@ def test_the_examples_in_the_docstrings_hold() -> None:
         assert results.failed == 0, module.__name__
         attempted += results.attempted
     assert attempted > 0
+
+
+# ---------------------------------------------------------------------------
+# Fixtures for the marker and difference-block tests below
+# ---------------------------------------------------------------------------
+class _Other:
+    """A class no value under test is an instance of, so a match always fails."""
+
+
+@dataclass
+class _Row:
+    """A record: the shape that used to make a difference block leak a class name."""
+
+    id: int
+    status: str
+
+
+#: One of every matcher the package builds, so a new one cannot join without
+#: being carried through the marker checks.
+#:
+#: Annotated ``object`` rather than left to inference: a matcher's declared type
+#: is the type it stands in for, so a tuple of assorted ones infers a union of
+#: fictions. Every test below asks about the object rather than about the value
+#: it claims to be, which is exactly what ``object`` says. Without ``Final``,
+#: because pyright reads a ``Final`` back at the type it inferred from the
+#: assignment rather than at the one declared beside it, and that inference is
+#: the union of fictions this annotation exists to discard.
+_EVERY_MATCHER: tuple[object, ...] = (
+    anything(),
+    any_instance_of(int),
+    one_of(1, 2),
+    close_to(1.0),
+    containing({"a": 1}),
+    matching(lambda _value: True),
+    string_containing("x"),
+    string_matching("x"),
+)
+
+
+# ---------------------------------------------------------------------------
+# The marker the equivalence engine recognises a matcher by
+# ---------------------------------------------------------------------------
+def test_both_halves_of_the_marker_spell_it_the_same() -> None:
+    """The one string is written twice, and drifting is silent.
+
+    ``_equivalence`` names no matcher type and imports nothing from this package
+    -- that is what lets a matcher work without a single assertion knowing one
+    exists -- so the two ends are joined by a string literal and by nothing else.
+    Change either alone and every matcher stops being recognised over there: the
+    difference block goes back to naming a private class, every assertion still
+    passes, and nothing else moves.
+    """
+    from lovely_assertions._equivalence._classification import _opacity
+    from lovely_assertions._matching._base import MATCHER_MARKER
+
+    assert _opacity._MATCHER_MARKER == MATCHER_MARKER  # pyright: ignore[reportPrivateUsage]
+
+
+def test_every_matcher_carries_the_marker_on_its_class() -> None:
+    """Read off the class, never the instance, so it must be there on the class."""
+    from lovely_assertions._matching._base import MATCHER_MARKER
+
+    for matcher in _EVERY_MATCHER:
+        assert getattr(type(matcher), MATCHER_MARKER, False) is True, repr(matcher)
+
+
+def test_the_marker_costs_a_matcher_no_space() -> None:
+    """A class attribute rather than a slot: it is not per-instance state."""
+    assert _base.Matcher.__slots__ == ()
+    for matcher in _EVERY_MATCHER:
+        slots = getattr(type(matcher), "__slots__", ())
+        assert "_stands_for_a_value_" not in slots, repr(matcher)
+
+
+def test_nothing_else_is_mistaken_for_a_matcher() -> None:
+    """The predicate answers on the class, so an ordinary object cannot fake it."""
+    from lovely_assertions._equivalence._classification import stands_for_a_value
+
+    class Impostor:
+        """Carries the marker on the *instance*, which is not where it is read."""
+
+        def __init__(self) -> None:
+            self._stands_for_a_value_ = True
+
+    for value in (3, "x", [1], {"a": 1}, object(), Impostor(), Mock()):
+        assert stands_for_a_value(value) is False, repr(value)
+    for matcher in _EVERY_MATCHER:
+        assert stands_for_a_value(matcher) is True, repr(matcher)
+
+
+def test_a_matcher_is_opaque_to_the_equivalence_engine() -> None:
+    """Named outright, so the ``_like_this_`` slot spelling is no longer the only guard."""
+    from lovely_assertions._equivalence._classification import is_opaque
+
+    for matcher in _EVERY_MATCHER:
+        assert is_opaque(matcher) is True, repr(matcher)
+
+
+# ---------------------------------------------------------------------------
+# The private class name a difference block used to leak
+# ---------------------------------------------------------------------------
+def test_a_composite_against_a_matcher_names_the_phrase_not_the_class() -> None:
+    """The bug this marker exists to close, pinned one matcher at a time.
+
+    A matcher is always a leaf and a record never is, so every composite value
+    meeting one lands on the kind-mismatch branch. Read as a type difference it
+    printed ``types differ: User instead of AnyInstance`` -- a class name no
+    reader has seen, standing where the phrase the matcher renders as belongs.
+    """
+    expected = {
+        "any_instance_of": "<any _Other>",
+        "one_of": "<one of 1, 2>",
+        "matching": "<matching a predicate>",
+        "close_to": "<close to 1.0>",
+        "containing": "<containing {'a': 1}>",
+        "string_matching": "<string matching 'x'>",
+    }
+    matchers: dict[str, object] = {
+        "any_instance_of": any_instance_of(_Other),
+        "one_of": one_of(1, 2),
+        "matching": matching(lambda _value: False),
+        "close_to": close_to(1.0),
+        "containing": containing({"a": 1}),
+        "string_matching": string_matching("x"),
+    }
+
+    for label, matcher in matchers.items():
+        with pytest.raises(lovely_assertions.AssertionFailure) as caught:
+            lovely_assertions.expect({"o": _Row(3, "pending")}).is_equivalent_to({"o": matcher})
+        note = str(caught.value).splitlines()[1].strip()
+        assert note == "o: _Row(id=3, status='pending') instead of " + expected[label], label
+
+
+def test_every_composite_shape_reads_the_same_way() -> None:
+    """Not only records: a list, a mapping and a set all mismatch a matcher's kind."""
+    for actual, rendered in (([1, 2], "[1, 2]"), ({"a": 1}, "{'a': 1}")):
+        with pytest.raises(lovely_assertions.AssertionFailure) as caught:
+            lovely_assertions.expect({"o": actual}).is_equivalent_to({"o": any_instance_of(_Other)})
+        note = str(caught.value).splitlines()[1].strip()
+        assert note == "o: " + rendered + " instead of <any _Other>"
+
+
+def test_a_matcher_on_the_actual_side_reads_the_same_way() -> None:
+    """``__eq__`` lets a matcher land on either side, so the branch asks about both."""
+    with pytest.raises(lovely_assertions.AssertionFailure) as caught:
+        lovely_assertions.expect({"o": any_instance_of(int)}).is_equivalent_to(
+            {"o": _Row(3, "pending")}
+        )
+
+    note = str(caught.value).splitlines()[1].strip()
+    assert note == "o: <any int> instead of _Row(id=3, status='pending')"
+
+
+def test_a_real_type_difference_still_says_types_differ() -> None:
+    """The branch was narrowed, not removed: without a matcher it reads as before."""
+    for actual, expected, note in (
+        (_Row(3, "pending"), [1], "o: types differ: _Row instead of list"),
+        ({"a": 1}, [1], "o: types differ: dict instead of list"),
+        ("x", [1], "o: types differ: str instead of list"),
+    ):
+        with pytest.raises(lovely_assertions.AssertionFailure) as caught:
+            lovely_assertions.expect({"o": actual}).is_equivalent_to({"o": expected})
+        assert str(caught.value).splitlines()[1].strip() == note
+
+
+def test_a_matcher_that_matches_a_composite_still_passes() -> None:
+    """None of the above changes a verdict; only what a failure says."""
+    lovely_assertions.expect({"o": _Row(3, "pending")}).is_equivalent_to(
+        {"o": any_instance_of(_Row)}
+    )
+
+    def a_pair(value: list[int]) -> bool:
+        return len(value) == 2
+
+    lovely_assertions.expect({"o": [1, 2]}).is_equivalent_to({"o": matching(a_pair)})
