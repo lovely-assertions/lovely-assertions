@@ -58,6 +58,8 @@ The complement names where the run begins, since "it is in there somewhere" is
 the half you already knew:
 
 ```python
+payload = b"GET /orders HTTP/1.1"
+
 try:
     expect(payload).does_not_contain(b"orders")
 except AssertionFailure as failure:
