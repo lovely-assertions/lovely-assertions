@@ -105,6 +105,84 @@ moment the suite runs in parallel.
 Nothing here costs a passing assertion anything — the `ContextVar` is read on the
 failure path only.
 
+### A bound for the whole suite
+
+There is no setting for this, and no plugin — the library ships neither. What
+there is instead is four lines you write in your own `conftest`:
+
+```python
+from collections.abc import Iterator
+
+import pytest
+
+from lovely_assertions import formatting
+
+
+@pytest.fixture(autouse=True)
+def wide_failures() -> Iterator[None]:
+    with formatting(max_items=40):
+        yield
+```
+
+Every test now fails at that bound. Scope is a free choice — `session`, `module`
+and `function` all work, and they stack — because pytest runs a synchronous
+fixture's setup, the test body and its teardown in one context, which is the same
+context the assertion reads.
+
+It composes the way the section above describes, and the round trip is the part
+worth seeing: a test that wants a narrower view opens its own block, and the
+suite's bound comes back when the block closes.
+
+```python
+from lovely_assertions import current_formatting, formatting
+
+with formatting(max_items=40):
+    print("the suite's bound:", current_formatting().max_items)
+    with formatting(max_items=3):
+        print("this one test:", current_formatting().max_items)
+    print("back to the suite's:", current_formatting().max_items)
+```
+
+```text
+the suite's bound: 40
+this one test: 3
+back to the suite's: 40
+```
+
+Call `formatting(...)` inside the fixture body rather than building one scope
+object at module level and reusing it. A scope holds a single reset token, so
+overlapping uses of one object collide; a fresh one per entry cannot.
+
+**A thread your test spawns renders at the defaults.** A new thread starts from
+an empty context, so it does not see the fixture's bound — or any other. This is
+the flip side of the isolation above, and it is not about fixtures at all:
+
+```python
+import threading
+
+from lovely_assertions import current_formatting, formatting
+
+seen: list[int] = []
+with formatting(max_items=40):
+    worker = threading.Thread(target=lambda: seen.append(current_formatting().max_items))
+    worker.start()
+    worker.join()
+    print("in the test:", current_formatting().max_items, "- in the thread:", seen[0])
+```
+
+```text
+in the test: 40 - in the thread: 10
+```
+
+An asyncio task is the other case, and it behaves differently for a reason worth
+knowing: a task copies the current context **when it is created**. One created
+inside the block inherits the bound; one created before it — an event loop stood
+up by a session fixture, say — does not.
+
+Contrast this with `register_formatter`, below, which goes in the `conftest`
+*module body* and never in a fixture. A formatter is a global registration; a
+bound is a scope. They are not interchangeable.
+
 ## Rendering: `register_formatter()`
 
 `repr` is the right default and a poor one for domain objects. A message reading

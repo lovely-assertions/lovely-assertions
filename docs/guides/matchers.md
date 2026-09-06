@@ -148,6 +148,165 @@ written straight into that call has no slot to be checked against.
 
 **So: declare the expectation rather than inlining it, when you want the checking.**
 
+## Composing matchers
+
+Two matchers combine by **nesting** one inside another, not by joining them with
+an operator. `one_of` takes matchers as readily as it takes values, which is how
+"an integer, or nothing" is spelled:
+
+```python
+from lovely_assertions import expect, any_instance_of, one_of, AssertionFailure
+
+a_row = {"id": any_instance_of(int), "parent": one_of(None, any_instance_of(int))}
+
+expect({"id": 7, "parent": None}).is_equal_to(a_row)
+expect({"id": 7, "parent": 3}).is_equal_to(a_row)
+
+orphan = {"id": 7, "parent": "x"}
+try:
+    expect(orphan).is_equal_to(a_row)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected orphan to equal {'id': <any int>, 'parent': <one of None, <any int>>}, but was {'id': 7, 'parent': 'x'}.
+  values differ at key 'parent': 'x' instead of <one of None, <any int>>
+```
+
+`containing` nests the same way: `containing({"id": matching(a_positive_id)})`
+asks for a mapping whose `id` satisfies a predicate of yours, and says nothing
+about the keys beside it.
+
+Everything else is one predicate. A conjunction, a length, an attribute, a
+prefix — a `def` says all of them in the language you already write tests in,
+and the annotated expectation keeps its element type:
+
+```python
+from dataclasses import dataclass
+
+from lovely_assertions import expect, matching
+
+
+@dataclass
+class Order:
+    reference: str
+    state: str
+    lines: list[str]
+
+
+def a_settled_order(order: Order) -> bool:
+    return (
+        order.state in {"paid", "shipped"}
+        and len(order.lines) > 0
+        and order.reference.startswith("AB-")
+    )
+
+
+shipments = {"latest": Order(reference="AB-9", state="shipped", lines=["widget"])}
+settled: dict[str, Order] = {"latest": matching(a_settled_order)}
+expect(shipments).is_equal_to(settled)
+print("three conditions, one slot, still a dict[str, Order]")
+```
+
+```text
+three conditions, one slot, still a dict[str, Order]
+```
+
+That is the same shape libraries elsewhere sell as `all_of`, `having`,
+`of_length` and `a_string`. Note what it is *not* for: those spellings are about
+one value inside an expectation. A claim about the **subject** has its own
+vocabulary already — chain the assertions, or reach for `satisfies_any`.
+
+### Name the predicate
+
+A `def` carries its name into the message. A lambda has nothing to carry:
+
+```python
+from lovely_assertions import expect, matching, AssertionFailure
+
+anonymous: dict[str, int] = {"eur": 40, "usd": matching(lambda amount: amount >= 100)}
+totals = {"eur": 40, "usd": 7}
+try:
+    expect(totals).is_equal_to(anonymous)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected totals to equal {'eur': 40, 'usd': <matching a predicate>}, but was {'eur': 40, 'usd': 7}.
+  values differ at key 'usd': 7 instead of <matching a predicate>
+```
+
+`__name__` is writable, so the phrase in the message is yours to choose. No
+registration, no wrapper, nothing to import:
+
+```python
+def a_three_figure_sum(amount: int) -> bool:
+    return amount >= 100
+
+
+a_three_figure_sum.__name__ = "a three-figure sum"
+
+in_the_hundreds: dict[str, int] = {"eur": 40, "usd": matching(a_three_figure_sum)}
+try:
+    expect(totals).is_equal_to(in_the_hundreds)
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected totals to equal {'eur': 40, 'usd': <matching a three-figure sum>}, but was {'eur': 40, 'usd': 7}.
+  values differ at key 'usd': 7 instead of <matching a three-figure sum>
+```
+
+Bind the expectation to an annotated name, as both blocks above do. An inline
+`matching(lambda ...)` written straight into `is_equal_to` has no slot to take
+its parameter type from, and neither checker can type it.
+
+**What composition costs.** The message names the predicate and stops there — it
+says the value did not match *a three-figure sum*, never which of three
+conditions failed. A predicate that bundles unrelated checks buys brevity and
+sells the diagnosis; that is the trade, and it is why one well-named predicate
+beats one that means four things.
+
+### Why there is no `&`, `|` or `~`
+
+Other libraries offer operators for this. They cannot be typed honestly here,
+because a matcher's declared type is the type it stands in for — so what the
+operators mean depends entirely on what is being matched:
+
+<!-- docs-test: expect-error - the point of the section: the checker refuses these for a str, and the block prints what happens for an int -->
+
+```python
+from lovely_assertions import any_instance_of
+
+try:
+    both = any_instance_of(str) & any_instance_of(str)
+except TypeError as error:
+    print("str &:", error)
+
+try:
+    either = any_instance_of(int) | any_instance_of(int)
+except TypeError as error:
+    print("int |:", error)
+```
+
+```text
+str &: unsupported operand type(s) for &: 'AnyInstance' and 'AnyInstance'
+int |: unsupported operand type(s) for |: 'AnyInstance' and 'AnyInstance'
+```
+
+The `str` line is a checker error — `str` has no `&`. The `int` line is not:
+`int | int` is perfectly good arithmetic, so the checker accepts it and says the
+result is an `int`. Neither one works at runtime.
+
+That asymmetry is the whole argument. An operator set that the checker refuses
+for a `str` matcher and blesses for an `int` one is not a feature, it is a
+coin-toss — and the `int` half is the bad half, because it is the one that gets
+past review. Nesting and a named predicate say the same things and say them the
+same way for every type.
+
 ## Gotchas
 
 ### A matcher belongs in an expectation and nowhere else

@@ -231,7 +231,7 @@ asserting on. `Found[P, V]` gives them `.and_` (back to your subject), `.which`
 (a subject over the found value) and `.subject` (the raw value):
 
 ```python
-from typing import Self
+from typing import Self, cast
 
 from lovely_assertions import Expect, Found, custom_assertion, expect
 
@@ -250,8 +250,11 @@ class MoneyExpect(Expect[Money]):
     def has_cents(self, expected: int, /, *, because: str = "") -> "Found[Self, int]":
         if self._subject.cents == expected:
             return Found(self, self._subject.cents)
-        return self._fail_narrowing(
-            f"to have {expected} cents, but had {self._subject.cents}", because
+        return cast(
+            "Found[Self, int]",
+            self._fail_narrowing(
+                f"to have {expected} cents, but had {self._subject.cents}", because
+            ),
         )
 
     @custom_assertion
@@ -280,6 +283,13 @@ Use `_fail_narrowing` rather than `_fail` on an assertion that was supposed to
 produce a narrowed subject: there is no narrowed subject to return, so a soft
 scope gets a stand-in that absorbs the rest of the chain instead of a wrapper
 whose static type is now a lie.
+
+**Wrap it in `cast`, as above.** `_fail_narrowing` is declared to return `Any` —
+it is the one place the library knowingly hands a checker nothing — and mypy's
+`--strict` includes `--warn-return-any`, so returning it bare from a function
+declared `Found[...]` is an error in a suite that runs mypy. pyright does not
+report it, which is why the shape is easy to get wrong. Every call site inside
+the library writes the `cast`; write it in yours.
 
 `Found`'s third parameter lets you promise what `.which` hands back —
 `Found[Self, str, StringExpect]`. **It is a promise, not a proof**: nothing ties
@@ -328,6 +338,95 @@ And everything cross-cutting works without you doing anything:
 [`formatting()`](controlling-output.md) bounds your rendered values, and
 `because=` attaches to your sentence. All of it because there is exactly one
 place a failure is reported, and you called it.
+
+## What you may rely on
+
+The public surface of this package is `__all__`, and everything above is built
+from it — `Expect`, `Found`, `custom_assertion`, `register`, `register_formatter`
+are all exported names. Writing a subject needs **two** things that are not:
+
+| Name | When you need it | Promise |
+|---|---|---|
+| `self._fail(expectation, because)` | every assertion | supported for a subclass, versioned with the package |
+| `self._fail_narrowing(expectation, because)` | an assertion that returns a `Found` | same |
+
+Nothing else about the internals is promised. A file layout, a mixin name, the
+wording inside a difference block, anything under `_diff` or `_equivalence` —
+those move without notice, and a release that moved one would not call itself
+breaking.
+
+Two clarifications worth having, because the underscore misleads:
+
+**Neither name was ever a `reportPrivateUsage` violation.** pyright reads a
+single leading underscore as *protected*, not private, so `self._fail(...)`
+inside your own subclass is ordinary strict-mode Python. What that rule does
+refuse is reaching in from outside — `expect(1)._subject` — which is not
+something an extension needs to do.
+
+**`_subject` is not on the list, and does not need to be.** `.subject` is a
+public property returning the same object, and a subject written with it is
+clean under both checkers and produces a byte-identical message. The library
+spells it `_subject` internally to read a slot instead of calling a property, on
+a path that runs once per assertion in a whole suite; in your own code, write
+whichever you prefer.
+
+### You probably do not need the difference engine
+
+The block under a failure sentence — `field qty: 7 instead of 9` — comes from
+`is_equal_to`, which every subject inherits. You get it by inheriting, not by
+calling anything:
+
+```python
+from dataclasses import dataclass
+
+from lovely_assertions import Expect, expect, AssertionFailure
+
+
+@dataclass
+class Line:
+    sku: str
+    qty: int
+
+
+class LineExpect(Expect[Line]):
+    __slots__ = ()
+
+
+picked = Line("nut", 7)
+try:
+    expect(picked, as_=LineExpect).is_equal_to(Line("nut", 9))
+except AssertionFailure as failure:
+    print(failure)
+```
+
+```text
+Expected picked to equal Line(sku='nut', qty=9), but was Line(sku='nut', qty=7).
+  field qty: 7 instead of 9
+```
+
+Subclass a *specific* subject and you inherit more than the block.
+`class BasketExpect(SequenceExpect[Line])` adds the positional prefix — the
+` at index N` a sequence message carries — because that comes from the sequence
+subject rather than from the difference engine. Reach for the closest subject
+that already fits your value before writing anything.
+
+Where you really do need to describe a difference yourself — a comparison the
+inherited assertion cannot express — it is reachable, and **import the module,
+not the function**:
+
+<!-- docs-test: skip - the contrast is about import-time cost, which a block sharing this page's namespace cannot demonstrate -->
+
+```python
+from lovely_assertions import _engine  # lazy: _diff is not loaded yet
+
+_engine.describe_difference(actual, expected)  # loads it here, on the failure path
+```
+
+`from lovely_assertions._engine import describe_difference` also works and costs
+you the thing `_engine` exists to buy: it resolves the name at *your* import
+time, which pulls the difference engine into every test session that imports your
+package, whether or not anything fails. Every caller inside the library uses the
+module form.
 
 ## Gotcha: `@custom_assertion` on a plain function
 
