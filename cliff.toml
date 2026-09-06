@@ -87,4 +87,12 @@ commit_parsers = [
 
 [bump]
 features_always_bump_minor = true
-breaking_always_bump_major = true
+
+# `false`, and it has to be: release-please is what writes the version here, and
+# it is configured `bump-minor-pre-major`, so a breaking change before 1.0.0
+# bumps the *minor*. This file only previews what a commit will say, and
+# `--bumped-version` previewing a major while the release produced a minor is a
+# preview that misleads the one reader it has.
+#
+# Revisit both together at 1.0.0, where the two agree again by default.
+breaking_always_bump_major = false
