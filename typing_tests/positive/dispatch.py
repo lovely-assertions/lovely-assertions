@@ -166,8 +166,14 @@ def parse(text: str, /) -> int:
 
 
 def callables_reach_the_exception_subject() -> None:
-    assert_type(expect(parse), CallableExpect)
-    assert_type(expect(lambda: parse("1")), CallableExpect)
+    # A callable that takes arguments has to be wrapped before anything on this
+    # subject can call it, so there is no return type worth carrying and the
+    # parameter falls back to its default.
+    assert_type(expect(parse), CallableExpect[object])
+    # A thunk is the shape the subject can actually call, so its return type is
+    # carried and `returns()` hands it on.
+    assert_type(expect(lambda: parse("1")), CallableExpect[int])
+    assert_type(expect(lambda: parse("1")).returns().subject, int)
     # A class is callable, so it reaches this family too -- but as a `TypeExpect`,
     # which says it is a class rather than only that it can be called. Nothing is
     # given up for that: `TypeExpect` extends `CallableExpect`, so

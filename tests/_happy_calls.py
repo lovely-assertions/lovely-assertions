@@ -568,6 +568,7 @@ HAPPY_CALLS: Final[dict[tuple[str, str], Callable[[World], object]]] = {
     ("MappingExpect", "is_not_empty"): lambda _: expect({"a": 1}).is_not_empty(),
     ("MappingExpect", "is_not_none_or_empty"): lambda _: expect({"a": 1}).is_not_none_or_empty(),
     # -- CallableExpect / RaisedExpect -------------------------------------
+    ("CallableExpect", "returns"): lambda _: expect(lambda: 3).returns(),
     ("CallableExpect", "does_not_raise"): lambda _: expect(lambda: None).does_not_raise(),
     ("CallableExpect", "raises"): lambda _: expect(_raise_plain).raises(ValueError),
     ("CallableExpect", "raises_exactly"): lambda _: expect(_raise_plain).raises_exactly(ValueError),

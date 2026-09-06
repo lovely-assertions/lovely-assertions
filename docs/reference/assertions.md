@@ -1302,7 +1302,7 @@ Expected order_status to be named 'SHIPPED', but Status.PENDING is named 'PENDIN
 ## `CallableExpect`
 
 ```python
-class CallableExpect(Expect[Callable[..., object]]):
+class CallableExpect[R = object](Expect[Callable[..., object]]):
 ```
 
 Returned for anything callable that is not a class. The subject is normally a
@@ -1347,6 +1347,10 @@ The warning assertions below come in the same two forms — `warns` here and
 
 - `warns[W: Warning](category: type[W], /, *, occurrences: Occurrence | None = None, because: str = "") -> WarnedExpect[W]` — Assert the call issues a warning of `category`; continue on the warnings.
 - `does_not_warn(category: type[Warning] | None = None, /, *, because: str = "") -> Self` — Assert the call issues no warning, or none of type `category`.
+
+**General**
+
+- `returns(*, because: str = "") -> Found[Self, R]` — Assert the call returns rather than raising, and continue on the result.
 
 **Inherited from [`Expect[T]`](#expectt)** (25 more): `subject`, `and_`,
 `described_as`, `is_truthy`, `is_falsy`, `satisfies_any`, `satisfies_none`,
@@ -1569,8 +1573,8 @@ than reporting a failure it did not establish.
 - `implements(protocol: type[object], /, *, because: str = "") -> Self` — Assert the class satisfies `protocol`.
 - `does_not_implement(protocol: type[object], /, *, because: str = "") -> Self` — Assert the class does not satisfy `protocol`.
 
-**Inherited from [`CallableExpect`](#callableexpect)** (five more): `raises`,
-`raises_exactly`, `does_not_raise`, `warns`, `does_not_warn`.
+**Inherited from [`CallableExpect`](#callableexpect)** (6 more): `raises`,
+`raises_exactly`, `does_not_raise`, `warns`, `does_not_warn`, `returns`.
 
 **Inherited from [`Expect[T]`](#expectt)** (25 more): `subject`, `and_`,
 `described_as`, `is_truthy`, `is_falsy`, `satisfies_any`, `satisfies_none`,

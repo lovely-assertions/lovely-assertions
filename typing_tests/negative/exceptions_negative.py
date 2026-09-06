@@ -103,3 +103,15 @@ def the_binding_carries_the_exception_through_the_block() -> None:
         parse("x")
     caught.where(lambda error: error.errno == 2)  # expect-error: ValueError has no errno
     caught.with_cause(KeyError).subject.errno  # expect-error: nor does the cause
+
+
+def returns_carries_the_thunk_s_own_type() -> None:
+    """The hole this exists to close: `object` where a real type was known."""
+    assert_type(expect(lambda: 3).returns().subject, object)  # expect-error
+    assert_type(expect(lambda: 3).returns().which, Expect[object])  # expect-error
+    assert_type(expect(lambda: "x").returns().subject, int)  # expect-error
+
+
+def returns_takes_nothing_positional(thunk: CallableExpect[int]) -> None:
+    thunk.returns("R")  # expect-error: `because` is keyword-only
+    thunk.returns(3)  # expect-error

@@ -221,8 +221,25 @@ def expect[E](value: Collection[E], /, *, name: str = ...) -> "CollectionExpect[
 # nothing by that, since `TypeExpect` extends `CallableExpect`. What lands here is
 # a function, a bound method, or an instance of a class defining `__call__`, and
 # the only cost is that `.subject` widens to the callable type.
+# A zero-argument callable is the shape every assertion on this subject can
+# actually call, so it is the one whose *return* type is worth carrying: it is
+# what `returns()` hands on, and without this arm `.returns().subject` would be
+# an `object` for a thunk whose type is perfectly well known.
+#
+# It refines a type argument and nothing else. The runtime answers
+# `CallableExpect` for any callable either way, so this is the one class of
+# overload addition that cannot put the two halves of the table out of step --
+# there is no runtime row to add beside it.
+#
+# mypy reads the arm below as unreachable, because it solves `R` against anything
+# rather than only against a callable that takes no arguments. It resolves both
+# calls correctly regardless; pyright reports nothing.
 @overload
-def expect(value: "Callable[..., object]", /, *, name: str = ...) -> "CallableExpect": ...
+def expect[R](value: "Callable[[], R]", /, *, name: str = ...) -> "CallableExpect[R]": ...
+@overload
+def expect(  # type: ignore[overload-cannot-match]  # mypy alone; see the note above
+    value: "Callable[..., object]", /, *, name: str = ...
+) -> "CallableExpect": ...
 @overload
 def expect[T](value: T, /, *, name: str = ...) -> Expect[T]: ...
 def expect(

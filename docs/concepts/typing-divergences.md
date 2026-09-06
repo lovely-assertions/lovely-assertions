@@ -156,6 +156,22 @@ pinned twice: statically in `typing_tests/positive/dispatch.py`, at runtime in
 `tests/test_narrowing.py`. Nothing compares the two lists, so keeping them in
 step is discipline rather than a guard. See [Typed dispatch](typed-dispatch.md).
 
+### `overload-cannot-match` (mypy)
+
+One site: the plain callable arm of `expect()`, which sits under the
+zero-argument arm that carries a return type.
+
+mypy reads the lower arm as unreachable because it solves `R` in
+`Callable[[], R]` against any callable at all, rather than only against one that
+takes no arguments. pyright reports nothing, and **mypy still resolves both calls
+correctly** — `expect(parse)` is a `CallableExpect[object]` and
+`expect(lambda: parse("1"))` a `CallableExpect[int]` under both checkers, which
+the positive corpus pins.
+
+Dropping the lower arm to silence it would be the wrong fix twice over: it is the
+arm a callable taking arguments actually matches under pyright, and the typing
+rules are explicit that an overload is never removed to make a checker happy.
+
 ### `reportPrivateUsage` (pyright)
 
 **Where:** three call sites. One reads `sys._getframe`, which is underscored but
