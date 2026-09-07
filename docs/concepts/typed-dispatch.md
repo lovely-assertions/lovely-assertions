@@ -73,6 +73,7 @@ overlaps in ways that would otherwise give the wrong answer:
 |---|---|
 | `bool` is a subclass of `int` | put `bool` before `int \| float` in the overloads, and give it a row in the exact-type table — the fallback chain behind that table answers `NumericExpect` |
 | `str` is a `Sequence[str]` | put `str` before `Sequence`, or `expect("x")` is a `SequenceExpect[str]` |
+| `bytes` is a `Sequence[int]` | put `bytes` before `Sequence` too, for the same reason and with a twist — see below |
 | an `IntEnum` member is an `int` | put enums before numbers, or `has_name` is out of reach |
 | an `Enum` class is iterable through its metaclass | put classes before collections |
 | a `Mapping` is a `Collection` | put `Mapping` before `Sequence` before `Collection` |
@@ -91,13 +92,34 @@ print(type(expect({1, 2})).__name__)
 BoolExpect
 NumericExpect
 StringExpect
-SequenceExpect
+BytesExpect
 CollectionExpect
 ```
 
-`bytes` landing on `SequenceExpect` is worth a second look: `bytes` really is a
-`Sequence[int]`, so its elements are integers, and `expect(b"abc").contains(97)`
-is the assertion that follows from that.
+`bytes` is worth a second look, and the reason is not the one `str` gives.
+`bytes` really *is* a `Sequence[int]` — `b"abc"[0]` is `97`, and
+`expect(b"abc").contains(97)` is the assertion that follows from that. So unlike
+`str`, whose subject stands apart, `BytesExpect` **extends**
+`SequenceExpect[int]` rather than replacing it:
+
+```python
+from lovely_assertions import expect
+
+# The integer reading, inherited and unchanged.
+print(expect(b"abc").contains(97).has_length(3).subject)
+# And the one a `SequenceExpect[int]` could not express.
+print(expect(b"abc").contains(b"bc").subject)
+```
+
+```text
+b'abc'
+b'abc'
+```
+
+The row exists because a byte string answers `in` for a *run* of bytes as well as
+for one — `b"bc" in b"abc"` — and a `SequenceExpect[int]` can only ever ask the
+first. Its own subject widens the question. Nothing is taken away: the integer
+reading is still there, and every sequence assertion still applies.
 
 ## Types the library refuses to import
 

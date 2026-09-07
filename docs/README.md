@@ -59,6 +59,7 @@ subject pages below links into the reference for the exhaustive list.
 | [Any value](guides/any-value.md) | Equality, identity, `None`, truthiness, types, predicates — available on every subject |
 | [Strings](guides/strings.md) | Containment, prefixes, regex, wildcards, character classes |
 | [Numbers and booleans](guides/numbers.md) | Comparisons, ranges, sign, tolerance, `nan`/`inf`, `implies` |
+| [Bytes](guides/bytes.md) | A byte string: membership either way, hex, and reading it as text |
 | [Collections](guides/collections.md) | Membership, length, set relations, duplicates, per-item checks |
 | [Sequences](guides/sequences.md) | Order, position, sorting, element-by-element comparison |
 | [Mappings](guides/mappings.md) | Keys, values, entries — and why the difference shows up in the message |

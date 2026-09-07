@@ -25,6 +25,7 @@ import pytest
 from lovely_assertions import (
     AssertionFailure,
     BoolExpect,
+    BytesExpect,
     CollectionExpect,
     DateExpect,
     DateTimeExpect,
@@ -96,8 +97,10 @@ class Permission(IntFlag):
         ({"a": 1}.values(), CollectionExpect),
         ({"a": 1}.items(), CollectionExpect),
         # A sequence is a collection with more to offer, so it keeps the richer
-        # subject rather than falling to the new one.
-        (b"abc", SequenceExpect),
+        # subject rather than falling to the new one. `bytes` goes one further: it
+        # has a subject of its own that *extends* the sequence one, because it
+        # answers `in` for a run of bytes as well as for a single one.
+        (b"abc", BytesExpect),
         (range(3), SequenceExpect),
         (deque([1]), SequenceExpect),
         # A mapping likewise: it is a collection of its keys, and its own subject
@@ -172,6 +175,7 @@ def test_dispatch_handles_subclasses_of_builtins() -> None:
 _EXACT_SAMPLES: dict[type[object], object] = {
     bool: True,
     str: "x",
+    bytes: b"x",
     int: 3,
     float: 3.5,
     dict: {"a": 1},

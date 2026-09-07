@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from pathlib import Path, PurePath
 
     from lovely_assertions._bool import BoolExpect
+    from lovely_assertions._bytes import BytesExpect
     from lovely_assertions._callable import CallableExpect
     from lovely_assertions._collection import CollectionExpect
     from lovely_assertions._datetime import (
@@ -184,6 +185,14 @@ def expect(value: "Fraction", /, *, name: str = ...) -> "OrderedExpect[Fraction]
 def expect(value: bool, /, *, name: str = ...) -> "BoolExpect": ...  # type: ignore[overload-overlap]  # pyright: ignore[reportOverlappingOverload]
 @overload
 def expect(value: str, /, *, name: str = ...) -> "StringExpect": ...  # type: ignore[overload-overlap]  # pyright: ignore[reportOverlappingOverload]
+# `bytes` shadows `Sequence[E]` exactly as `str` does, and for the same reason:
+# it is a sequence, and its own subject says more about it. It sits under `str`
+# and above the sequence row, in the order the runtime walks. Neither checker
+# objects -- `bytes` is not a `bool`, an `int` or a `float`, so it overlaps
+# nothing above it, and the row it shadows is far enough below to be reached by
+# first-match-wins rather than by an overlap.
+@overload
+def expect(value: bytes, /, *, name: str = ...) -> "BytesExpect": ...
 @overload
 def expect(value: int | float, /, *, name: str = ...) -> "NumericExpect": ...
 # `Mapping` deliberately shadows `Collection[E]` below, the way `str` shadows
@@ -578,6 +587,12 @@ _EXACT_SUBJECTS: dict[type[Any], "Callable[[Any], Expect[Any]]"] = {}
 _EXACT_ROWS: "tuple[tuple[type[Any], str, str], ...]" = (
     (bool, "_bool", "BoolExpect"),
     (str, "_string", "StringExpect"),
+    # `bytes` would otherwise fall through to the shape ladder and land on
+    # `Sequence`, which is true and not the whole truth: its elements are
+    # integers *and* it answers `in` for a run of them. `BytesExpect` extends the
+    # sequence subject rather than replacing it, so this row changes which class
+    # is built and nothing about what the old one could do.
+    (bytes, "_bytes", "BytesExpect"),
     (int, "_numeric", "NumericExpect"),
     (float, "_numeric", "NumericExpect"),
     (dict, "_mapping", "MappingExpect"),

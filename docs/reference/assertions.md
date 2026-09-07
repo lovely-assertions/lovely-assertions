@@ -88,6 +88,7 @@ strings.
 - [`Expect[T]`](#expectt)
 - [`BoolExpect`](#boolexpect)
 - [`StringExpect`](#stringexpect)
+- [`BytesExpect`](#bytesexpect)
 - [`OrderedExpect[T]`](#orderedexpectt)
 - [`NumericExpect`](#numericexpect)
 - [`CollectionExpect[E, C]`](#collectionexpecte-c)
@@ -130,10 +131,11 @@ offers and what you actually get are the same thing.
 | 13 | `str` | `"hello"`, and any `str` subclass | `StringExpect` |
 | 14 | `int \| float` | `3`, `3.5`, and their subclasses | `NumericExpect` |
 | 15 | `Mapping[K, V]` | `dict`, `OrderedDict`, `ChainMap`, `MappingProxyType` | `MappingExpect[K, V]` |
-| 16 | `Sequence[E]` | `list`, `tuple`, `range`, `bytes`, `bytearray` | `SequenceExpect[E]` |
-| 17 | `Collection[E]` | `set`, `frozenset`, and the three `dict` views | `CollectionExpect[E, C]` |
-| 18 | `Callable[..., object]` | a function, a lambda, a bound method | `CallableExpect` |
-| 19 | anything else | `None`, a generator, a plain object | `Expect[T]` |
+| 16 | `bytes` | `bytes` only; `bytearray` and `memoryview` stay sequences | `BytesExpect` |
+| 17 | `Sequence[E]` | `list`, `tuple`, `range`, `bytearray` | `SequenceExpect[E]` |
+| 18 | `Collection[E]` | `set`, `frozenset`, and the three `dict` views | `CollectionExpect[E, C]` |
+| 19 | `Callable[..., object]` | a function, a lambda, a bound method | `CallableExpect` |
+| 20 | anything else | `None`, a generator, a plain object | `Expect[T]` |
 
 The order is the mechanism, not an accident, and it reads from the narrow to
 the broad. A class comes first because an `Enum` class is iterable through its
@@ -159,7 +161,7 @@ actually returned when this table was generated.
 
 | Call | Subject | Why |
 | --- | --- | --- |
-| `expect(b"abc")` | `SequenceExpect` | `bytes` is a `Sequence[int]`, so the elements are integers. |
+| `expect(b"abc")` | `BytesExpect` | a `SequenceExpect[int]` with more on it: the elements really are integers, and `in` also asks about a run of bytes. |
 | `expect(range(3))` | `SequenceExpect` | a `range` is a sequence, and is not materialised. |
 | `expect({1, 2})` | `CollectionExpect` | a `set` is a `Collection` but not a `Sequence` — no indexing, no order. |
 | `expect(int)` | `TypeExpect` | a class is a class before it is anything else, callable though it is. |
@@ -486,6 +488,83 @@ expect(hostname).ends_with(".example.com")
 Expected hostname to end with '.example.com', but was 'db-01.internal'.
 ```
 
+## `BytesExpect`
+
+```python
+class BytesExpect(SequenceExpect[int]):
+```
+
+Returned for a `bytes`, and it **extends** `SequenceExpect[int]` rather than
+replacing it. `bytes` really is a sequence of integers — `b"abc"[0]` is `97` —
+so every sequence assertion still applies and `contains(97)` still means what it
+always did.
+
+What its own subject adds is the reading a `SequenceExpect[int]` cannot express:
+`bytes` answers `in` for a *run* of bytes as well as for one, so `contains` is
+widened rather than replaced. `decoded_as` is the other half — it hands back a
+genuine `str`, so the whole string catalogue follows it.
+
+`bytearray` and `memoryview` are unchanged and still reach `SequenceExpect[int]`.
+
+**What is inside**
+
+- `contains(item: int, /, *, occurrences: Occurrence | None = None, because: str = "") -> Self` or `contains(item: bytes, /, *, occurrences: Occurrence | None = None, because: str = "") -> Self` — Assert the byte string holds `item`: one byte, or a run of them.
+- `does_not_contain(item: int, /, *, occurrences: Occurrence | None = None, because: str = "") -> Self` or `does_not_contain(item: bytes, /, *, occurrences: Occurrence | None = None, because: str = "") -> Self` — Assert the byte string does not hold `item`: one byte, or a run of them.
+- `has_byte_at(index: int, value: int, /, *, because: str = "") -> Self` — Assert the byte at `index` is `value`.
+
+**As text**
+
+- `is_valid_utf8(*, because: str = "") -> Self` — Assert the byte string decodes as UTF-8.
+- `decoded_as(encoding: str, /, *, because: str = "") -> Found[Self, str, StringExpect]` — Assert the byte string decodes, and continue on the text.
+
+**Inherited from [`SequenceExpect[E]`](#sequenceexpecte)** (sixteen more):
+`equals_sequence`, `does_not_equal_sequence`, `equals_approximately`,
+`starts_with_sequence`, `ends_with_sequence`, `has_element_at`,
+`contains_in_order`, `does_not_contain_in_order`,
+`contains_in_consecutive_order`, `does_not_contain_in_consecutive_order`,
+`is_sorted`, `is_not_sorted`, `is_sorted_descending`,
+`is_not_sorted_descending`, `extracting`, `satisfies_respectively`.
+`does_not_contain` is redeclared above, and the declaration there is the one
+this subject offers.
+
+**Inherited from [`CollectionExpect[E, C]`](#collectionexpecte-c)** (44 more):
+`is_empty`, `is_not_empty`, `is_none_or_empty`, `is_not_none_or_empty`,
+`has_length`, `does_not_have_length`, `has_length_matching`,
+`has_length_greater_than`, `has_length_greater_than_or_equal_to`,
+`has_length_less_than`, `has_length_less_than_or_equal_to`,
+`has_same_length_as`, `does_not_have_same_length_as`, `contains_single`,
+`contains_matching`, `does_not_contain_matching`, `contains_single_matching`,
+`only_contains`, `contains_items_of_type`, `does_not_contain_items_of_type`,
+`does_not_contain_none`, `has_unique_items`, `contains_no_duplicates`,
+`is_subset_of`, `is_not_subset_of`, `is_superset_of`, `is_not_superset_of`,
+`is_proper_subset_of`, `is_proper_superset_of`, `intersects`,
+`does_not_intersect`, `is_disjoint_from`, `contains_only`, `contains_none_of`,
+`contains_all`, `does_not_contain_all`, `contains_any`, `all_are_instance_of`,
+`all_are_exactly_type`, `all_equal_to`, `all_satisfy`, `satisfies_in_any_order`,
+`contains_match`, `does_not_contain_match`. `contains` and `does_not_contain`
+are redeclared above, and the declaration there is the one this subject offers.
+
+**Inherited from [`Expect[T]`](#expectt)** (25 more): `subject`, `and_`,
+`described_as`, `is_truthy`, `is_falsy`, `satisfies_any`, `satisfies_none`,
+`is_equal_to`, `is_not_equal_to`, `is_equivalent_to`, `is_not_equivalent_to`,
+`is_same_as`, `is_not_same_as`, `is_none`, `is_not_none`, `is_one_of`, `is_in`,
+`is_not_in`, `matches`, `satisfies`, `is_instance_of`, `is_not_instance_of`,
+`is_exactly_instance_of`, `is_not_exactly_instance_of`, `as_type`.
+
+**What a failure looks like**
+
+```python
+from lovely_assertions import expect
+
+payload = b"GET /orders HTTP/1.1"
+
+expect(payload).contains(b"HTTP/2")
+```
+
+```
+Expected payload to contain b'HTTP/2', but was b'GET /orders HTTP/1.1'.
+```
+
 ## `OrderedExpect[T]`
 
 ```python
@@ -720,7 +799,7 @@ the whole list is what the reader needs.
 class SequenceExpect[E](CollectionExpect[E, Sequence[E]]):
 ```
 
-Returned for a `Sequence` — `list`, `tuple`, `range`, `bytes` — parameterised by
+Returned for a `Sequence` — `list`, `tuple`, `range`, `bytearray` — parameterised by
 the element type, so `expect(names).contains(3)` is a type error when `names` is
 a `Sequence[str]`. Everything here is an assertion that needs an order to mean
 anything; the rest of the catalogue is inherited from the collection subject.

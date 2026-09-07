@@ -172,6 +172,21 @@ Dropping the lower arm to silence it would be the wrong fix twice over: it is th
 arm a callable taking arguments actually matches under pyright, and the typing
 rules are explicit that an overload is never removed to make a checker happy.
 
+### `reportIncompatibleVariableOverride` (pyright)
+
+One site: `BytesBase` narrows the inherited `_subject` from `Sequence[int]` to
+`bytes`, under `TYPE_CHECKING`, so nothing exists at runtime.
+
+pyright reports it because narrowing a *mutable* attribute is unsound in general
+— something holding the base type could write a plain list into it. Here nothing
+can: the slot is written once, in a constructor, by a dispatcher that builds this
+subject for a `bytes` and for nothing else.
+
+The alternative is `bytes(self._subject)` at each call site, which converts a
+`bytes` into itself and is not free — a call and a couple of dozen bytes on the
+path of every *passing* assertion in that package. mypy accepts the narrowing
+without complaint.
+
 ### `reportPrivateUsage` (pyright)
 
 **Where:** three call sites. One reads `sys._getframe`, which is underscored but

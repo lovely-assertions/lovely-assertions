@@ -300,6 +300,7 @@ def _every_subject() -> list[_Case]:
     anything = expect(object())
     rows = expect({"a": 1, "b": 2})
     mock = expect(Mock(), as_=MockExpect)
+    payload = expect(b"abc")
     number = expect(5.5)
     amount = expect(_A_DECIMAL)
     file = expect(_A_REAL_FILE)
@@ -330,6 +331,7 @@ def _every_subject() -> list[_Case]:
         _Case("EnumExpect.has_name", lambda: colour.has_name("RED"), _nothing, ""),
         _Case("Expect.is_not_none", anything.is_not_none, _nothing, ""),
         _Case("MappingExpect.contains_entry", lambda: rows.contains_entry("a", 1), _nothing, ""),
+        _Case("BytesExpect.has_byte_at", lambda: payload.has_byte_at(0, 0x61), _nothing, ""),
         _Case("MockExpect.was_not_called", mock.was_not_called, _nothing, ""),
         _Case("NumericExpect.is_not_nan", number.is_not_nan, _nothing, ""),
         _Case(
@@ -651,6 +653,12 @@ _CALL_ITERATOR: Final = (
     "`not matched` decided, so the branch that passes built one too"
 )
 
+_DECODES: Final = (
+    "decodes the bytes, which is the question. There is no way to know a payload "
+    "is text without building the text, and `decoded_as` hands that text on as its "
+    "product rather than dropping it"
+)
+
 _REGEX: Final = (
     "matches a regular expression: the match object is `re`'s, and the compiled "
     "pattern is `re`'s cache, filled by the warmup"
@@ -819,6 +827,9 @@ _ALLOCATES_BY_DESIGN: Final[dict[_Key, tuple[int, str]]] = {
     ("SequenceExpect", "has_element_at"): (48, _CONTINUATION),
     ("TypeExpect", "has_attribute"): (48, _CONTINUATION),
     ("TypeExpect", "has_method"): (48, _CONTINUATION),
+    # -- decoding ----------------------------------------------------
+    ("BytesExpect", "is_valid_utf8"): (44, _DECODES),
+    ("BytesExpect", "decoded_as"): (100, _DECODES),
     # -- regular expressions -----------------------------------------
     ("RaisedExpect", "with_message"): (120, _REGEX),
     ("RaisedExpect", "with_note_matching"): (168, _REGEX),
@@ -1212,16 +1223,26 @@ def test_the_exemption_table_cannot_grow() -> None:
     moving -- and adding a line to it is always the cheapest way to make this file
     green, cheaper than finding the waste.
 
-    144 is where it stands. Editing this number down is what removing an
+    146 is where it stands. Editing this number down is what removing an
     exemption looks like; editing it up means arguing for it in review rather
     than in a commit nobody reads.
 
-    The one that took it from 143 is `CallableExpect.returns`, and it is the
-    plainest row in the table: measured beside its neighbours, the whole cost is
-    the `Found` it hands back, which is the object the caller asked for. The
-    `cast` beside it and the call into the subject both measure zero.
+    The three that took it from 143 come from two places, and in neither is the
+    argument that the cost was unavoidable in general. One is
+    `CallableExpect.returns`, the plainest row in the table: measured beside its
+    neighbours, the whole cost is the `Found` it hands back, which is the object
+    the caller asked for, and the `cast` beside it and the call into the subject
+    both measure zero.
+
+    The other two are the byte subject's decoding pair, where the allocation *is*
+    the assertion: there is no way to know a payload is text without building the
+    text. Everything else that subject added was taken to zero instead --
+    `contains` by asking `find` rather than `in`, which is the same question of
+    the same C routine at none of the cost, and the rest by narrowing the
+    subject's declared type instead of converting a `bytes` into itself on every
+    passing call.
     """
-    assert len(_ALLOCATES_BY_DESIGN) <= 144, (
+    assert len(_ALLOCATES_BY_DESIGN) <= 146, (
         f"_ALLOCATES_BY_DESIGN has grown to {len(_ALLOCATES_BY_DESIGN)} entries. "
         f"It is a shrinking list: an exemption is a cost that was argued for, not "
         f"a place to put a new one."
