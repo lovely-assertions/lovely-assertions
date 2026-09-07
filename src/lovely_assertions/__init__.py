@@ -66,6 +66,11 @@ if TYPE_CHECKING:
     from lovely_assertions._callable import CallableExpect as CallableExpect
     from lovely_assertions._callable import RaisedExpect as RaisedExpect
     from lovely_assertions._callable import expect_raises as expect_raises
+    from lovely_assertions._change import Change as Change
+    from lovely_assertions._change import NoChange as NoChange
+    from lovely_assertions._change import NumericChange as NumericChange
+    from lovely_assertions._change import expect_change as expect_change
+    from lovely_assertions._change import expect_no_change as expect_no_change
     from lovely_assertions._collection import CollectionExpect as CollectionExpect
     from lovely_assertions._core import Expect as Expect
     from lovely_assertions._core import Found as Found
@@ -142,6 +147,7 @@ _HOME: dict[str, str] = {
     "AssertionFailure": "lovely_assertions._exceptions",
     "BoolExpect": "lovely_assertions._bool",
     "CallableExpect": "lovely_assertions._callable",
+    "Change": "lovely_assertions._change",
     "CollectionExpect": "lovely_assertions._collection",
     "DateExpect": "lovely_assertions._datetime",
     "DateTimeExpect": "lovely_assertions._datetime",
@@ -153,6 +159,8 @@ _HOME: dict[str, str] = {
     "IterableFormatter": "lovely_assertions._formatters",
     "MappingExpect": "lovely_assertions._mapping",
     "MockExpect": "lovely_assertions._mock",
+    "NoChange": "lovely_assertions._change",
+    "NumericChange": "lovely_assertions._change",
     "NumericExpect": "lovely_assertions._numeric",
     "ObjectFormatter": "lovely_assertions._formatters",
     "Occurrence": "lovely_assertions._occurrence",
@@ -181,6 +189,8 @@ _HOME: dict[str, str] = {
     "equivalency": "lovely_assertions._equivalence",
     "exactly": "lovely_assertions._occurrence",
     "expect": "lovely_assertions._subjects",
+    "expect_change": "lovely_assertions._change",
+    "expect_no_change": "lovely_assertions._change",
     "expect_raises": "lovely_assertions._callable",
     "expect_warns": "lovely_assertions._warnings",
     "format_value": "lovely_assertions._formatters",
@@ -223,6 +233,7 @@ __all__ = [
     "AssertionFailure",
     "BoolExpect",
     "CallableExpect",
+    "Change",
     "CollectionExpect",
     "DateExpect",
     "DateTimeExpect",
@@ -234,6 +245,8 @@ __all__ = [
     "IterableFormatter",
     "MappingExpect",
     "MockExpect",
+    "NoChange",
+    "NumericChange",
     "NumericExpect",
     "ObjectFormatter",
     "Occurrence",
@@ -262,6 +275,8 @@ __all__ = [
     "equivalency",
     "exactly",
     "expect",
+    "expect_change",
+    "expect_no_change",
     "expect_raises",
     "expect_warns",
     "format_value",

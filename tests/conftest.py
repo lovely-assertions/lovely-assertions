@@ -126,6 +126,12 @@ CANNOT_FAIL: Final[dict[tuple[str, str], str]] = {
         "hands back a `WithinDelta`; the assertion is in its `.before` / `.after`, "
         "and an unfinished chain warns through `__del__` rather than failing"
     ),
+    ("Change", "to"): (
+        "narrows the claim and hands the scope back; the assertion is the `with` "
+        "block, which reports from `__exit__` and is exercised failing in "
+        "`test_change.py`. A scope built and never entered warns through `__del__`"
+    ),
+    ("NumericChange", "by"): ("narrows the claim and hands the scope back; see `Change.to` above"),
 }
 
 #: Assertions seen to fail during this session, filled in by the monitor below.

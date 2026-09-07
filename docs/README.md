@@ -73,6 +73,7 @@ subject pages below links into the reference for the exhaustive list.
 
 | Page | Covers |
 |------|--------|
+| [Changes](guides/changes.md) | What an action did to a value: `expect_change`, `expect_no_change` |
 | [Soft assertions](guides/soft-assertions.md) | Collect every failure in a block instead of stopping at the first |
 | [Matchers](guides/matchers.md) | Assert the shape of a value when you cannot name all of it |
 | [Structural equivalence](guides/structural-equivalence.md) | Compare two object graphs member by member |

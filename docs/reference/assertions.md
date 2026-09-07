@@ -1681,6 +1681,16 @@ of the list belongs.
 | `Found` | The result of an assertion that *found* a value inside the subject. |
 | `WithinDelta` | The middle of `is_within(delta).before(other)`. |
 
+**What an action changed**
+
+| Name | What it is |
+| --- | --- |
+| `expect_change(probe: Callable[[], bool], /, *, because: str = ...) -> Change[bool]` |  |
+| `expect_no_change[V](probe: Callable[[], V], /, *, because: str = "") -> NoChange[V]` | Assert the block leaves the value `probe` reads exactly where it was. |
+| `Change` | What `expect_change` hands back. |
+| `NumericChange` | A change scope that can also be asked *how much*. |
+| `NoChange` | What `expect_no_change` hands back. |
+
 **How many times**
 
 | Name | What it is |
