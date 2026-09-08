@@ -16,10 +16,11 @@ something there rather than nothing: ``contains_only_keys()`` asserts the mappin
 is empty, and ``satisfies_respectively()`` asserts the sequence is.
 """
 
+import asyncio
 import inspect
 from collections.abc import Callable
 from decimal import Decimal
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -109,7 +110,10 @@ def test_a_populated_call_is_unaffected() -> None:
 #: ``was_called_with()`` asserts the mock was called **with no arguments**, and
 #: reports "expected to have been called with no arguments, but was called with
 #: (1)" when it was not. Refusing the empty call would remove the only way to say
-#: that.
+#: that. The four ``AsyncMockExpect`` rows say the same thing about awaits, and
+#: are listed for the same reason rather than because each one trips the guard:
+#: only the negative form passes on a specimen that was awaited with arguments,
+#: and listing one of a matched set would leave the other three looking refused.
 _MEANINGFUL_WHEN_EMPTY = frozenset(
     {
         ("MappingExpect", "contains_only_keys"),
@@ -119,6 +123,10 @@ _MEANINGFUL_WHEN_EMPTY = frozenset(
         ("MockExpect", "was_called_once_with"),
         ("MockExpect", "was_ever_called_with"),
         ("MockExpect", "was_never_called_with"),
+        ("AsyncMockExpect", "was_awaited_with"),
+        ("AsyncMockExpect", "was_awaited_once_with"),
+        ("AsyncMockExpect", "was_ever_awaited_with"),
+        ("AsyncMockExpect", "was_never_awaited_with"),
     }
 )
 
@@ -135,6 +143,12 @@ def _specimens() -> dict[str, object]:
     """
     called = Mock()
     called(1, key="v")
+    awaited = AsyncMock()
+
+    async def drive() -> None:
+        await awaited(1, key="v")
+
+    asyncio.run(drive())
     return {
         "Expect": expect(object()),
         "BoolExpect": expect(True),
@@ -145,6 +159,7 @@ def _specimens() -> dict[str, object]:
         "SequenceExpect": expect([1, 2]),
         "MappingExpect": expect({"a": 1}),
         "MockExpect": expect(called),
+        "AsyncMockExpect": expect(awaited),
         "CallableExpect": expect(len),
         "TypeExpect": expect(int),
     }

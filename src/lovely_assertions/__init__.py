@@ -113,7 +113,9 @@ if TYPE_CHECKING:
     from lovely_assertions._matching import one_of as one_of
     from lovely_assertions._matching import string_containing as string_containing
     from lovely_assertions._matching import string_matching as string_matching
+    from lovely_assertions._mock import AsyncMockExpect as AsyncMockExpect
     from lovely_assertions._mock import MockExpect as MockExpect
+    from lovely_assertions._mock import is_async_mock as is_async_mock
     from lovely_assertions._mock import is_mock as is_mock
     from lovely_assertions._names import custom_assertion as custom_assertion
     from lovely_assertions._numeric import NumericExpect as NumericExpect
@@ -146,6 +148,7 @@ if TYPE_CHECKING:
 #: ``__version__`` loads none of it at all.
 _HOME: dict[str, str] = {
     "AssertionFailure": "lovely_assertions._exceptions",
+    "AsyncMockExpect": "lovely_assertions._mock",
     "BoolExpect": "lovely_assertions._bool",
     "BytesExpect": "lovely_assertions._bytes",
     "CallableExpect": "lovely_assertions._callable",
@@ -197,6 +200,7 @@ _HOME: dict[str, str] = {
     "expect_warns": "lovely_assertions._warnings",
     "format_value": "lovely_assertions._formatters",
     "formatting": "lovely_assertions._formatting",
+    "is_async_mock": "lovely_assertions._mock",
     "is_matcher": "lovely_assertions._matching",
     "is_mock": "lovely_assertions._mock",
     "less_than": "lovely_assertions._occurrence",
@@ -233,6 +237,7 @@ def __dir__() -> list[str]:
 
 __all__ = [
     "AssertionFailure",
+    "AsyncMockExpect",
     "BoolExpect",
     "BytesExpect",
     "CallableExpect",
@@ -284,6 +289,7 @@ __all__ = [
     "expect_warns",
     "format_value",
     "formatting",
+    "is_async_mock",
     "is_matcher",
     "is_mock",
     "less_than",

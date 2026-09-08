@@ -23,6 +23,7 @@ from lovely_assertions._core import Expect
 from lovely_assertions._exceptions import hide_internal_frames
 from lovely_assertions._mock._recognition import (
     FIRST_MOCK_MARKER,
+    answers_the_async_protocol,
     answers_the_protocol,
     is_mock,
 )
@@ -125,6 +126,12 @@ _CALLABLE: "Callable[[Any], Expect[Any]]" = _named("_callable", "CallableExpect"
 #: never loads the family that recognises one.
 _MOCK: "Callable[[Any], Expect[Any]]" = _named("_mock", "MockExpect")
 
+#: The subject for a mock that records awaits as well as calls. A second name
+#: rather than a flag on the first, because the two catalogues differ: only this
+#: one can be asked whether the coroutine it handed back was ever awaited, and a
+#: synchronous mock answering that question would answer it with a child mock.
+_ASYNC_MOCK: "Callable[[Any], Expect[Any]]" = _named("_mock", "AsyncMockExpect")
+
 #: What this module defines. The subject classes used to be re-exported here so
 #: the package could import them from one place; the package reaches each one in
 #: the module that defines it now, which is what lets a program load only the
@@ -218,12 +225,15 @@ def expect[E](value: Collection[E], /, *, name: str = ...) -> "CollectionExpect[
 # walks.
 #
 # There is deliberately NO overload for a mock, though the runtime dispatches one
-# to `MockExpect`. typeshed gives `NonCallableMock` an `Any` in its MRO, so a mock
+# to `MockExpect` -- or to `AsyncMockExpect`, for a mock that records awaits.
+# typeshed gives `NonCallableMock` an `Any` in its MRO, so a mock
 # is statically assignable to *everything* -- `b: bool = Mock()` type-checks --
 # and no position in this list can reach it: the first concrete overload always
 # wins. That makes the static answer for a mock meaningless whatever we write, so
-# the runtime is left to be right on its own. `expect(mock, as_=MockExpect)` is
-# the typed route.
+# the runtime is left to be right on its own. `expect(mock, as_=MockExpect)` and
+# `expect(mock, as_=AsyncMockExpect)` are the typed routes, and they are also the
+# only place a checker can be made to enforce the split between the two
+# catalogues.
 # A callable is a subject in its own right: `expect(parse).raises(ValueError)`.
 # It sits second-to-last because everything above it is narrower. A class never
 # reaches it -- the `type[Any]` overload at the top claims classes -- and loses
@@ -339,10 +349,22 @@ def _dispatch(value: object, subject_type: type[Any], /) -> Any:  # noqa: ANN401
     # function carrying the mock protocol as *instance* attributes, so its class
     # declares none of the markers. `_mock.is_mock` says the rest, and stays
     # exactly as it is -- it is public surface.
+    #
+    # The async question is asked second and of the same object, never of the
+    # instance when the class was what answered: `hasattr(Mock(), "await_count")`
+    # is True, because a synchronous mock answers every name with a child mock, so
+    # asking the instance would hand every mock the await catalogue and let it
+    # compare against a child mock standing in for a list. It costs a second
+    # frame, and only for a value that is already a mock -- `expect(3)` never
+    # reaches this line at all.
     if subject_type is FunctionType:
         if answers_the_protocol(value):
+            if answers_the_async_protocol(value):
+                return _ASYNC_MOCK(value)
             return _MOCK(value)
     elif hasattr(subject_type, FIRST_MOCK_MARKER) and answers_the_protocol(subject_type):
+        if answers_the_async_protocol(subject_type):
+            return _ASYNC_MOCK(value)
         return _MOCK(value)
     factory = _REGISTERED.get(subject_type)
     if factory is None:

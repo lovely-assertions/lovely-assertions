@@ -169,22 +169,33 @@ static answer is bought with a pile of suppressions and is only useful where a
 parameter is *declared* `Mock`, which in a real suite it often is not.
 
 So the library ships no static overload, and the runtime is left to be right on
-its own: it checks for a mock first and builds a `MockExpect`. Leaving the
+its own: it checks for a mock first and builds a mock subject. Leaving the
 runtime wrong as well would cost something real and buy nothing.
 
+Which mock subject is a second runtime-only decision. A mock that records
+*awaits* gets `AsyncMockExpect`, carrying the await catalogue on top of the call
+one; every other mock gets `MockExpect`.
+
 ```python
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 from lovely_assertions import expect
 
 print(type(expect(Mock())).__name__)
+print(type(expect(AsyncMock())).__name__)
 ```
 
 ```text
 MockExpect
+AsyncMockExpect
 ```
 
-When you want the static answer too, name it: `expect(fetch, as_=MockExpect)`.
-See [Mocks](../guides/mocks.md).
+That second split is where the cost of this divergence is felt rather than merely
+recorded. A checker cannot see it at all, so it cannot tell you that a plain
+`Mock` has no `was_awaited` — and pointing the async subject at a synchronous
+mock is a real mistake with no static warning.
+
+When you want the static answer too, name it: `expect(fetch, as_=MockExpect)`, or
+`as_=AsyncMockExpect` for the await catalogue. See [Mocks](../guides/mocks.md).
 
 ## Your own types
 

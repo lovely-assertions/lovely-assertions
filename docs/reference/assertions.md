@@ -106,6 +106,7 @@ strings.
 - [`WarnedExpect[W]`](#warnedexpectw)
 - [`TypeExpect`](#typeexpect)
 - [`MockExpect`](#mockexpect)
+- [`AsyncMockExpect`](#asyncmockexpect)
 - [Elsewhere in the public API](#elsewhere-in-the-public-api)
 
 ## Which subject you get
@@ -1741,6 +1742,90 @@ Expected send to have been called with ('welcome', to='grace@example.com'), but 
     values differ at key 'to': 'ada@example.com' instead of 'grace@example.com'
 ```
 
+## `AsyncMockExpect`
+
+```python
+class AsyncMockExpect(MockExpect):
+```
+
+Returned instead of `MockExpect` for a mock that records *awaits* as well as
+calls — an `AsyncMock`, a `Mock(spec=some_async_function)`, or the async members
+of an autospecced class. It is a `MockExpect` with one more catalogue on it, so
+everything above is still available.
+
+The split is not cosmetic. Calling an `AsyncMock` and never awaiting the
+coroutine it hands back satisfies every assertion on the call side, here and in
+`unittest.mock` both, while the work never ran; only the await side can say so. A
+synchronous `Mock` keeps no such list, and — because a mock answers every
+attribute with a child mock — an await assertion pointed at one would compare
+against that child and pass. So it is offered on the subject that can answer it
+and nowhere else.
+
+It shares `MockExpect`'s typing limitation and its remedy:
+`expect(m, as_=AsyncMockExpect)` is the typed route.
+
+**How often**
+
+- `was_called(*, because: str = "") -> Self` — Assert the mock was called at least once.
+- `was_not_called(*, because: str = "") -> Self` — Assert the mock was never called.
+- `was_called_once(*, because: str = "") -> Self` — Assert the mock was called exactly once, whatever the arguments.
+- `has_call_count(expected: int | Occurrence, /, *, because: str = "") -> Self` — Assert how many times the mock was called.
+
+**With what**
+
+- `was_called_with(*args: object, because: str = "", **kwargs: object) -> Self` — Assert the **most recent** call was made with these arguments.
+- `was_called_once_with(*args: object, because: str = "", **kwargs: object) -> Self` — Assert the mock was called exactly once, and with these arguments.
+- `was_ever_called_with(*args: object, because: str = "", **kwargs: object) -> Self` — Assert some call — any of them — was made with these arguments.
+- `was_never_called_with(*args: object, because: str = "", **kwargs: object) -> Self` — Assert no call was made with these arguments.
+
+**Continuations**
+
+- `.calls -> SequenceExpect[Any]` — The recorded calls, as a sequence subject.
+- `last_call(*, because: str = "") -> Found[Self, Any]` — Assert the mock was called, and continue on its most recent call.
+
+**How often it was awaited**
+
+- `was_awaited(*, because: str = "") -> Self` — Assert the mock was awaited at least once.
+- `was_not_awaited(*, because: str = "") -> Self` — Assert the mock was never awaited.
+- `was_awaited_once(*, because: str = "") -> Self` — Assert the mock was awaited exactly once, whatever the arguments.
+- `has_await_count(expected: int | Occurrence, /, *, because: str = "") -> Self` — Assert how many times the mock was awaited.
+
+**What it was awaited with**
+
+- `was_awaited_with(*args: object, because: str = "", **kwargs: object) -> Self` — Assert the **most recent** await was made with these arguments.
+- `was_awaited_once_with(*args: object, because: str = "", **kwargs: object) -> Self` — Assert the mock was awaited exactly once, and with these arguments.
+- `was_ever_awaited_with(*args: object, because: str = "", **kwargs: object) -> Self` — Assert some await — any of them — was made with these arguments.
+- `was_never_awaited_with(*args: object, because: str = "", **kwargs: object) -> Self` — Assert no await was made with these arguments.
+
+**Continuations over awaits**
+
+- `.awaits -> SequenceExpect[Any]` — The recorded awaits, as a sequence subject.
+- `last_await(*, because: str = "") -> Found[Self, Any]` — Assert the mock was awaited, and continue on its most recent await.
+
+**Inherited from [`Expect[T]`](#expectt)** (25 more): `subject`, `and_`,
+`described_as`, `is_truthy`, `is_falsy`, `satisfies_any`, `satisfies_none`,
+`is_equal_to`, `is_not_equal_to`, `is_equivalent_to`, `is_not_equivalent_to`,
+`is_same_as`, `is_not_same_as`, `is_none`, `is_not_none`, `is_one_of`, `is_in`,
+`is_not_in`, `matches`, `satisfies`, `is_instance_of`, `is_not_instance_of`,
+`is_exactly_instance_of`, `is_not_exactly_instance_of`, `as_type`.
+
+**What a failure looks like**
+
+```python
+from unittest.mock import AsyncMock
+
+from lovely_assertions import expect
+
+publish = AsyncMock()
+publish("order.placed")  # the coroutine is built, and nobody awaits it
+
+expect(publish).was_awaited_once_with("order.placed")
+```
+
+```
+Expected publish to have been awaited once with ('order.placed'), but it was called once with ('order.placed') and never awaited.
+```
+
 ## Elsewhere in the public API
 
 Not assertions, but exported from `lovely_assertions` and worth knowing exist;
@@ -1825,6 +1910,7 @@ of the list belongs.
 | `register[T](subject_type: type[T], factory: Callable[[T], Expect[T]], /) -> None` | Teach `expect()` to return a custom subject for `subject_type`. |
 | `custom_assertion[F: Callable[..., Any]](func: F, /) -> F` | Mark a user-defined assertion function so its frame is skipped when naming the subject. |
 | `is_mock(value: object, /) -> bool` | Whether `value` behaves like a `unittest.mock` mock. The dispatch predicate. |
+| `is_async_mock(value: object, /) -> bool` | Whether `value` records awaits as well as calls. A mock, and an async one. |
 
 A soft scope changes the shape of a message rather than its content: failures
 are collected instead of raised, the scope's name is prefixed to every subject

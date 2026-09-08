@@ -829,6 +829,16 @@ send("welcome", to="ada@example.com")
 
 expect(send).was_called_with("welcome", to="grace@example.com")
 """,
+    "AsyncMockExpect": """\
+from unittest.mock import AsyncMock
+
+from lovely_assertions import expect
+
+publish = AsyncMock()
+publish("order.placed")  # the coroutine is built, and nobody awaits it
+
+expect(publish).was_awaited_once_with("order.placed")
+""",
     "BytesExpect": """\
 from lovely_assertions import expect
 
@@ -889,6 +899,7 @@ TARGETS: list[tuple[str, str, str]] = [
     ("_warnings/_subject.py", "WarnedExpect", "WarnedExpect[W]"),
     ("_type/_subject.py", "TypeExpect", "TypeExpect"),
     ("_mock/_subject.py", "MockExpect", "MockExpect"),
+    ("_mock/_subject.py", "AsyncMockExpect", "AsyncMockExpect"),
 ]
 
 #: Private base classes whose assertions belong in a public subject's own
@@ -923,6 +934,13 @@ SHARED_BASES: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("_mock/_counting.py", "CountingAssertions", "How often"),
         ("_mock/_arguments.py", "ArgumentAssertions", "With what"),
         ("_mock/_continuations.py", "ContinuationAssertions", "Continuations"),
+    ),
+    "AsyncMockExpect": (
+        ("_mock/_base.py", "MockBase", "How often"),
+        ("_mock/_counting.py", "CountingAssertions", "How often"),
+        ("_mock/_arguments.py", "ArgumentAssertions", "With what"),
+        ("_mock/_continuations.py", "ContinuationAssertions", "Continuations"),
+        ("_mock/_awaiting.py", "AwaitAssertions", "How often it was awaited"),
     ),
     "CallableExpect": (
         ("_callable/_raising.py", "RaisingAssertions", "Raising"),
@@ -1143,6 +1161,7 @@ EXTRAS: list[tuple[str, tuple[tuple[str, str, str], ...]]] = [
             ("_subjects.py", "function", "register"),
             ("_names/_frames.py", "function", "custom_assertion"),
             ("_mock/_recognition.py", "function", "is_mock"),
+            ("_mock/_recognition.py", "function", "is_async_mock"),
         ),
     ),
 ]
@@ -1324,6 +1343,23 @@ SUBJECT_INTRO: dict[str, str] = {
         "assignable to everything, so no position in the overload list could reach it.\n"
         "`expect(m, as_=MockExpect)` is the typed route, and\n"
         "[the divergence ledger](../concepts/typing-divergences.md) records the trade."
+    ),
+    "AsyncMockExpect": (
+        "Returned instead of `MockExpect` for a mock that records *awaits* as well as\n"
+        "calls — an `AsyncMock`, a `Mock(spec=some_async_function)`, or the async members\n"
+        "of an autospecced class. It is a `MockExpect` with one more catalogue on it, so\n"
+        "everything above is still available.\n"
+        "\n"
+        "The split is not cosmetic. Calling an `AsyncMock` and never awaiting the\n"
+        "coroutine it hands back satisfies every assertion on the call side, here and in\n"
+        "`unittest.mock` both, while the work never ran; only the await side can say so. A\n"
+        "synchronous `Mock` keeps no such list, and — because a mock answers every\n"
+        "attribute with a child mock — an await assertion pointed at one would compare\n"
+        "against that child and pass. So it is offered on the subject that can answer it\n"
+        "and nowhere else.\n"
+        "\n"
+        "It shares `MockExpect`'s typing limitation and its remedy:\n"
+        "`expect(m, as_=AsyncMockExpect)` is the typed route."
     ),
 }
 

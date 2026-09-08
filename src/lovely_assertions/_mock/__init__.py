@@ -28,15 +28,31 @@ module is for.
 
 The second half is the messages. ``assert_called_once_with`` fails three
 different ways -- never called, called with something else, called more than once
--- and reports all three as one sentence about the call count::
+-- and answers them in two shapes, neither of which says what the reader needs.
+
+Two of the three come back as the same sentence about the count, mentioning no
+arguments at all::
 
     Expected 'mock' to be called once. Called 3 times.
     Calls: [call('/users'), call('/other'), call('/users')].
 
-Which of those calls matched? Which argument was wrong? mock does not say. Here
-each of the three is its own message, argument differences go through the same
-difference engine every other assertion uses, and the message names the calls
-that *did* match -- the fact a reader otherwise has to work out by eye.
+Which of those three calls matched? It does not say, and that is the difference
+between "called the right thing twice too often" and "called three wrong things".
+
+The third comes back in a different shape, and only when there was exactly one
+call::
+
+    expected call not found.
+    Expected: mock('/a')
+      Actual: mock('/b')
+
+Two call lines, and the differing argument is left for the reader to spot. There
+is no count here and no listing, so the two shapes never appear together: a wrong
+argument on a mock called twice is reported purely as a count.
+
+Here each of the three is its own message, argument differences go through the
+same difference engine every other assertion uses, and the message names the
+calls that *did* match -- the fact a reader otherwise has to work out by eye.
 
 **Nothing here imports ``unittest.mock``**, at module level or inside a function.
 It is not needed: recognising a mock is a question about a class (see
@@ -82,19 +98,31 @@ within comes from :func:`~lovely_assertions._formatting.current_formatting`, rea
 in the failure branch and nowhere else -- reading it earlier would put a
 ``ContextVar`` lookup on the path of every assertion that passes.
 
-Five files: what makes something a mock, how a call is rendered, whether one
-matches, why one did not, and the subject those four serve.
+**A mock that records awaits gets a subject of its own.** Calling an
+``AsyncMock`` and never awaiting the coroutine it returns satisfies every
+assertion on the call side -- here and in ``unittest.mock`` both -- and says
+nothing about whether the work ran. :mod:`lovely_assertions._mock._awaiting` asks
+the same questions of ``await_args_list``, and
+:class:`~lovely_assertions.AsyncMockExpect` is where the two catalogues meet. A
+synchronous mock is never handed that subject: it keeps no such list, and a mock
+answers every attribute, so an await assertion pointed at one would compare
+against a child mock and pass.
+
+One file per question: what makes something a mock, how a call is rendered,
+whether one matches, why one did not, how often it was called, what it was called
+with, whether it was awaited -- and the subjects those serve.
 """
 
 from typing import TYPE_CHECKING, Any
 
 from lovely_assertions._exceptions import hide_internal_frames
-from lovely_assertions._mock._recognition import is_mock
+from lovely_assertions._mock._recognition import is_async_mock, is_mock
 
 if TYPE_CHECKING:
     # The redundant-looking ``as`` is what marks this a re-export, so a checker
     # reads the real signature here rather than taking ``Any`` from the
     # ``__getattr__`` below.
+    from lovely_assertions._mock._subject import AsyncMockExpect as AsyncMockExpect
     from lovely_assertions._mock._subject import MockExpect as MockExpect
 
 #: pytest reads ``__tracebackhide__`` from a frame's globals, so this one
@@ -103,23 +131,28 @@ if TYPE_CHECKING:
 #: :func:`lovely_assertions._exceptions.hide_internal_frames`.
 __tracebackhide__ = hide_internal_frames
 
-__all__ = ["MockExpect", "is_mock"]
+__all__ = ["AsyncMockExpect", "MockExpect", "is_async_mock", "is_mock"]
 
 
-def __getattr__(name: str) -> Any:  # noqa: ANN401  (one name, and it is a class)
-    """Bind the mock subject on first use, and not before.
+def __getattr__(name: str) -> Any:  # noqa: ANN401  (two names, and both are classes)
+    """Bind a mock subject on first use, and not before.
 
     The dispatcher reaches :mod:`lovely_assertions._mock._recognition` through
     this package to decide whether a value *is* a mock, and that question is
-    asked of every value handed to ``expect()``. Importing the subject here would
-    therefore load the whole family -- the subject, its counting, its argument
-    matching and its rendering -- to compare two integers. Deferring it is what
-    keeps recognising a mock cheaper than being one.
+    asked of every value handed to ``expect()``. Importing a subject here would
+    therefore load the whole family -- both subjects, the counting, the argument
+    matching, the awaiting and the rendering -- to compare two integers.
+    Deferring it is what keeps recognising a mock cheaper than being one.
+
+    Both names resolve out of the same module, so a session that asserts on one
+    kind of mock pays for the other's class object and nothing more: the seams
+    are shared, and the async subject is its base list.
     """
-    if name != "MockExpect":
+    if name not in {"AsyncMockExpect", "MockExpect"}:
         message = "module " + __name__ + " has no attribute " + repr(name)
         raise AttributeError(message)
-    from lovely_assertions._mock._subject import MockExpect  # noqa: PLC0415  (the point)
+    from lovely_assertions._mock import _subject  # noqa: PLC0415  (the point)
 
-    globals()[name] = MockExpect
-    return MockExpect
+    value = getattr(_subject, name)
+    globals()[name] = value
+    return value

@@ -42,6 +42,7 @@ Everything used solely to build the table below (``_Colour``, ``_caught``,
 """
 
 import abc
+import asyncio
 import enum
 import inspect
 from collections.abc import Callable
@@ -52,13 +53,14 @@ from importlib import import_module
 from pathlib import Path, PurePosixPath
 from types import ModuleType
 from typing import Final, Protocol, runtime_checkable
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 import lovely_assertions
 from _package import module_name, sources
 from lovely_assertions import (
+    AsyncMockExpect,
     Expect,
     MockExpect,
     RaisedExpect,
@@ -168,6 +170,8 @@ class World:
     link: Path | None
     called: Mock
     uncalled: Mock
+    awaited: AsyncMock
+    unawaited: AsyncMock
 
 
 def build_world(root: Path, /) -> World:
@@ -201,6 +205,19 @@ def build_world(root: Path, /) -> World:
         link = None
     called = Mock()
     called(1, key="v")
+    awaited = AsyncMock()
+
+    async def drive() -> None:
+        await awaited(1, key="v")
+
+    asyncio.run(drive())
+    # Called and never awaited: the state the await catalogue exists to tell
+    # apart from "never called", and the specimen every negative await assertion
+    # needs. `close()` keeps the dropped coroutine from emitting
+    # `RuntimeWarning: coroutine was never awaited` out of the garbage collector
+    # and onto whichever test happens to be running then.
+    unawaited = AsyncMock()
+    unawaited(1, key="v").close()
     return World(
         file=file,
         empty_file=empty_file,
@@ -210,6 +227,8 @@ def build_world(root: Path, /) -> World:
         link=link,
         called=called,
         uncalled=Mock(),
+        awaited=awaited,
+        unawaited=unawaited,
     )
 
 
@@ -832,6 +851,27 @@ HAPPY_CALLS: Final[dict[tuple[str, str], Callable[[World], object]]] = {
         9
     ),
     ("MockExpect", "was_not_called"): lambda w: MockExpect(w.uncalled).was_not_called(),
+    ("AsyncMockExpect", "has_await_count"): lambda w: AsyncMockExpect(w.awaited).has_await_count(1),
+    ("AsyncMockExpect", "last_await"): lambda w: AsyncMockExpect(w.awaited).last_await(),
+    ("AsyncMockExpect", "was_awaited"): lambda w: AsyncMockExpect(w.awaited).was_awaited(),
+    ("AsyncMockExpect", "was_awaited_once"): lambda w: AsyncMockExpect(
+        w.awaited
+    ).was_awaited_once(),
+    ("AsyncMockExpect", "was_awaited_once_with"): lambda w: AsyncMockExpect(
+        w.awaited
+    ).was_awaited_once_with(1, key="v"),
+    ("AsyncMockExpect", "was_awaited_with"): lambda w: AsyncMockExpect(w.awaited).was_awaited_with(
+        1, key="v"
+    ),
+    ("AsyncMockExpect", "was_ever_awaited_with"): lambda w: AsyncMockExpect(
+        w.awaited
+    ).was_ever_awaited_with(1, key="v"),
+    ("AsyncMockExpect", "was_never_awaited_with"): lambda w: AsyncMockExpect(
+        w.unawaited
+    ).was_never_awaited_with(1, key="v"),
+    ("AsyncMockExpect", "was_not_awaited"): lambda w: AsyncMockExpect(
+        w.unawaited
+    ).was_not_awaited(),
 }
 
 #: Assertions with no happy-path exercise, each with the reason. **Shrink only**:

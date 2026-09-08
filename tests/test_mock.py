@@ -1189,7 +1189,12 @@ def test_importing_the_library_does_not_pull_unittest_mock_in() -> None:
 
 
 def test_the_public_surface_is_exported_and_sorted() -> None:
-    assert mock_module.__all__ == ["MockExpect", "is_mock"]
+    assert mock_module.__all__ == [
+        "AsyncMockExpect",
+        "MockExpect",
+        "is_async_mock",
+        "is_mock",
+    ]
     assert list(mock_module.__all__) == sorted(mock_module.__all__)
     for name in mock_module.__all__:
         assert hasattr(mock_module, name), f"__all__ advertises missing name {name!r}"
