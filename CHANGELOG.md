@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [git-cliff](https://git-cliff.org). Don't edit it -- write the commit message,
 which a CI gate already requires to be a Conventional Commit.
 
+## [0.3.0](https://github.com/lovely-assertions/lovely-assertions/compare/v0.2.0...v0.3.0) (2026-09-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **collection:** fail a claim about every item when there are no items ([#48](https://github.com/lovely-assertions/lovely-assertions/issues/48))
+
+### Features
+
+* **bytes:** give a byte string a subject of its own, without taking anything away ([#47](https://github.com/lovely-assertions/lovely-assertions/issues/47)) ([be5c63f](https://github.com/lovely-assertions/lovely-assertions/commit/be5c63fbd7aa7b58861a4c461a86627d7947be85))
+* **collection:** fail a claim about every item when there are no items ([#48](https://github.com/lovely-assertions/lovely-assertions/issues/48)) ([eb653b2](https://github.com/lovely-assertions/lovely-assertions/commit/eb653b2de64c4c13f6e98758e48b443179a09e3c))
+* **soft:** read a scope's failures without emptying it, and bound the report it raises ([#45](https://github.com/lovely-assertions/lovely-assertions/issues/45)) ([99aad02](https://github.com/lovely-assertions/lovely-assertions/commit/99aad027ff84ee4aec364ce82a9a4d2da837a1f1))
+* **string:** assert that fragments appear in order, which contains_all cannot ([#46](https://github.com/lovely-assertions/lovely-assertions/issues/46)) ([e27bf4a](https://github.com/lovely-assertions/lovely-assertions/commit/e27bf4aed22098110342ae92d900a679f106008c))
+
+
+### Bug fixes
+
+* **changelog:** preview the version release-please will actually publish ([#51](https://github.com/lovely-assertions/lovely-assertions/issues/51)) ([9aed73a](https://github.com/lovely-assertions/lovely-assertions/commit/9aed73a1ae46cacdd8b1db5a97580e44bbdb2a6b))
+* **equivalence:** render a matcher as its phrase, not as the class behind it ([#43](https://github.com/lovely-assertions/lovely-assertions/issues/43)) ([94124ed](https://github.com/lovely-assertions/lovely-assertions/commit/94124edf27567cf63efb7b9b37644a6503758652))
+
+
+### Documentation
+
+* make three shipped capabilities reachable, and fix an example that fails mypy ([#42](https://github.com/lovely-assertions/lovely-assertions/issues/42)) ([d769a65](https://github.com/lovely-assertions/lovely-assertions/commit/d769a654f3bf3965325b99aa936dfb27240ce0d9))
+
+
+### Tests
+
+* **collection:** bound the hash table by its bytes, not by the clock ([#50](https://github.com/lovely-assertions/lovely-assertions/issues/50)) ([0147558](https://github.com/lovely-assertions/lovely-assertions/commit/014755832c0eccb4f0f94046295f0a00a8ea8c02))
+* **docs:** check each example on its own, and under mypy as well ([#52](https://github.com/lovely-assertions/lovely-assertions/issues/52)) ([4868987](https://github.com/lovely-assertions/lovely-assertions/commit/486898705cc1fb52c600c56b6bf12745d47d5845))
+
+
+### Build
+
+* bump ruff from 0.16.4 to 0.16.5 in the dev-tooling group ([#54](https://github.com/lovely-assertions/lovely-assertions/issues/54)) ([8d07ddf](https://github.com/lovely-assertions/lovely-assertions/commit/8d07ddfe49ca849f62c02df033d332f44586eeea))
+
 ## [0.2.0](https://github.com/lovely-assertions/lovely-assertions/compare/v0.1.0...v0.2.0) (2026-09-01)
 
 
